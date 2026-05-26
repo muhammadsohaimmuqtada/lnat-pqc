@@ -90,7 +90,7 @@ lnat-pqc/
 ## Quick Start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/lnat-pqc
+git clone https://github.com/muhammadsohaimmuqtada/lnat-pqc
 cd lnat-pqc
 pip install -r requirements.txt
 python tests/test_kem.py
@@ -206,7 +206,7 @@ If you use this work, please cite:
   title  = {LNAT: Learning Noisy Automata Transitions,
              a Post-Quantum Cryptographic Primitive},
   year   = {2026},
-  note   = {Pre-publication draft. \url{https://github.com/YOUR_USERNAME/lnat-pqc}}
+  note   = {Pre-publication draft. \url{https://github.com/muhammadsohaimmuqtada/lnat-pqc}}
 }
 ```
 
