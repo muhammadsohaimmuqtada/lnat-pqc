@@ -6,8 +6,8 @@
 #   Encap   -> (ciphertext, session_key)
 #   Decap   -> session_key
 #
-# Security target: IND-CPA (sketch)
-# IND-CCA2 via Fujisaki-Okamoto transform (TODO: full proof)
+# Security target: IND-CPA demo only
+# IND-CCA2 transform (e.g., Fujisaki-Okamoto) is not implemented
 #
 # NOTE: Reference implementation. Not for production use.
 
@@ -16,9 +16,8 @@ import json
 import hashlib
 import secrets
 from dataclasses import dataclass
-from lnat_params import LNATParams, LNAT128, ALL_PARAMS
-from lnat_core  import (LNATAutomaton, generate_seed,
-                         generate_input_sequence, prf)
+from .lnat_params import LNATParams, LNAT128, ALL_PARAMS
+from .lnat_core import LNATAutomaton, generate_seed, generate_input_sequence, prf
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -285,7 +284,7 @@ class LNATKEM:
 # ──────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    from lnat_params import LNAT128
+    from .lnat_params import LNAT128
 
     print("LNAT-KEM Demo")
     print("=" * 50)

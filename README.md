@@ -55,35 +55,39 @@ lnat-pqc/
 ├── README.md                  ← you are here
 ├── SECURITY.md                ← responsible disclosure policy
 ├── LICENSE                    ← MIT License
+├── pyproject.toml             ← packaging + pytest configuration
+├── requirements.txt           ← legacy notes / optional deps
+├── .gitignore
 │
-├── src/                       ← reference implementations
-│   ├── lnat_core.py           ← core automaton primitive
-│   ├── lnat_kem.py            ← Key Encapsulation Mechanism
-│   ├── lnat_sign.py           ← Digital Signature Scheme
-│   └── lnat_params.py         ← parameter sets (128/192/256)
+├── src/
+│   └── lnat_pqc/              ← installable Python package
+│       ├── __init__.py
+│       ├── lnat_core.py       ← core automaton primitive
+│       ├── lnat_kem.py        ← Key Encapsulation Mechanism (IND-CPA demo)
+│       └── lnat_params.py     ← parameter sets (128/192/256)
 │
-├── tests/                     ← test suite
+├── tests/                     ← pytest suite
 │   ├── test_kem.py            ← KEM correctness tests
 │   ├── test_hardness.py       ← hard problem demonstration
-│   ├── test_vectors.py        ← known answer tests (KATs)
-│   └── vectors/
-│       └── kat_128.json       ← test vectors for LNAT-128
-│
-├── benchmarks/
-│   └── bench.py               ← performance benchmarks vs Kyber
 │
 ├── paper/
-│   └── lnat_research_paper.docx  ← full research paper
+│   └── LNAT_Research_Paper.docx  ← full research paper draft
 │
 ├── docs/
-│   ├── CONSTRUCTION.md        ← detailed algorithm specification
-│   ├── SECURITY.md            ← security analysis and known attacks
-│   ├── PARAMETERS.md          ← parameter justification
-│   └── CONTRIBUTING.md        ← how to contribute
+│   ├── CONTRIBUTING.md        ← how to contribute
+│   └── SECURITY.md            ← security notes for the research draft
 │
-└── reference/
-    └── hard_problem_demo.py   ← standalone demo of the hard problem
+└── .github/
+    └── workflows/
+        └── tests.yml          ← CI: run pytest on push / pull_request
 ```
+
+### Planned / not yet implemented
+
+- `src/lnat_sign.py` (signature prototype)
+- `tests/test_vectors.py` and `tests/vectors/` known-answer test vectors
+- `benchmarks/` benchmarking scripts
+- `reference/` standalone hard problem demo scripts
 
 ---
 
@@ -92,8 +96,13 @@ lnat-pqc/
 ```bash
 git clone https://github.com/muhammadsohaimmuqtada/lnat-pqc
 cd lnat-pqc
-pip install -r requirements.txt
-python tests/test_kem.py
+python -m pip install -e .[test]
+pytest
+```
+
+```python
+from lnat_pqc.lnat_kem import LNATKEM
+from lnat_pqc.lnat_params import LNAT128
 ```
 
 ---
@@ -169,7 +178,7 @@ See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
 
 ## Research Paper
 
-The full research paper is in [paper/lnat_research_paper.docx](paper/).
+The full research paper is in [paper/LNAT_Research_Paper.docx](paper/LNAT_Research_Paper.docx).
 
 It covers:
 - Formal problem definition
@@ -184,9 +193,9 @@ It covers:
 
 - [x] Hard problem defined
 - [x] KEM construction sketched
-- [x] Sign construction sketched
+- [ ] Sign construction sketched (planned)
 - [x] Reference Python implementation
-- [x] Known answer tests
+- [ ] Known answer tests
 - [ ] Lazy PRF tree optimization
 - [ ] BCH error correction integration
 - [ ] Formal security proof

@@ -13,7 +13,7 @@ import os
 import hmac
 import hashlib
 import secrets
-from lnat_params import LNATParams, LNAT128
+from .lnat_params import LNATParams, LNAT128
 
 
 # ──────────────────────────────────────────────────────────────────────────────

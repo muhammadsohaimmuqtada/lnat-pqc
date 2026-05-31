@@ -1,162 +1,92 @@
-# test_kem.py
-# Correctness tests for LNAT-KEM
-#
-# Run with: python tests/test_kem.py
-# All tests should pass before any commit.
-
-import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+import secrets
 
-from lnat_params import LNAT128, LNAT192, ALL_PARAMS
-from lnat_kem    import LNATKEM
-
-PASS = "✓"
-FAIL = "✗"
-results = []
-
-def test(name, condition):
-    status = PASS if condition else FAIL
-    results.append((name, condition))
-    print(f"  {status}  {name}")
-    return condition
+from lnat_pqc.lnat_core import LNATAutomaton, generate_input_sequence
+from lnat_pqc.lnat_kem import LNATKEM
+from lnat_pqc.lnat_params import LNAT128
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Test 1 — Basic correctness (keys match after round trip)
-# ──────────────────────────────────────────────────────────────────────────────
+def test_basic_round_trip_correctness():
+    kem = LNATKEM(LNAT128)
+    pk, sk = kem.keygen()
+    ct, k_enc = kem.encap(pk)
+    k_dec = kem.decap(sk, pk, ct)
 
-print("\nTest 1 — Basic round-trip correctness (LNAT-128)")
-kem = LNATKEM(LNAT128)
-pk, sk = kem.keygen()
-ct, K_enc = kem.encap(pk)
-K_dec = kem.decap(sk, pk, ct)
-test("Encap and Decap produce same session key", K_enc == K_dec)
-test("Session key is 32 bytes", len(K_enc) == 32)
-test("Ciphertext is non-empty", len(ct.ct_bits) > 0)
-test("Public key has Y of length T", len(pk.Y) == LNAT128.T)
+    assert k_enc == k_dec
+    assert len(k_enc) == 32
+    assert len(ct.ct_bits) > 0
+    assert len(pk.Y) == LNAT128.T
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Test 2 — Different keypairs produce different session keys
-# ──────────────────────────────────────────────────────────────────────────────
+def test_independent_keypairs_are_independent():
+    kem = LNATKEM(LNAT128)
+    pk1, sk1 = kem.keygen()
+    pk2, sk2 = kem.keygen()
+    ct1, k1 = kem.encap(pk1)
+    ct2, k2 = kem.encap(pk2)
+    k1_dec = kem.decap(sk1, pk1, ct1)
+    k2_dec = kem.decap(sk2, pk2, ct2)
 
-print("\nTest 2 — Independent keypairs are independent")
-kem = LNATKEM(LNAT128)
-pk1, sk1 = kem.keygen()
-pk2, sk2 = kem.keygen()
-ct1, K1 = kem.encap(pk1)
-ct2, K2 = kem.encap(pk2)
-K1_dec = kem.decap(sk1, pk1, ct1)
-K2_dec = kem.decap(sk2, pk2, ct2)
-test("KEM 1 round trip correct", K1 == K1_dec)
-test("KEM 2 round trip correct", K2 == K2_dec)
-test("Two different keypairs produce different session keys", K1 != K2)
-test("Private keys are different", sk1.seed != sk2.seed)
-test("Public keys have different Y", pk1.Y != pk2.Y)
+    assert k1 == k1_dec
+    assert k2 == k2_dec
+    assert k1 != k2
+    assert sk1.seed != sk2.seed
+    assert pk1.Y != pk2.Y
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Test 3 — Wrong private key cannot decapsulate
-# ──────────────────────────────────────────────────────────────────────────────
+def test_wrong_private_key_fails():
+    kem = LNATKEM(LNAT128)
+    pk1, _ = kem.keygen()
+    _, sk2 = kem.keygen()
+    ct, k_correct = kem.encap(pk1)
+    k_wrong = kem.decap(sk2, pk1, ct)
 
-print("\nTest 3 — Wrong private key fails")
-kem = LNATKEM(LNAT128)
-pk1, sk1 = kem.keygen()
-pk2, sk2 = kem.keygen()
-ct, K_correct = kem.encap(pk1)
-K_wrong = kem.decap(sk2, pk1, ct)   # wrong sk
-test("Wrong private key does not recover correct key", K_correct != K_wrong)
+    assert k_correct != k_wrong
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Test 4 — Multiple encapsulations to same public key give different session keys
-# ──────────────────────────────────────────────────────────────────────────────
+def test_multiple_encapsulations_to_same_public_key_are_unique():
+    kem = LNATKEM(LNAT128)
+    pk, _ = kem.keygen()
 
-print("\nTest 4 — Same public key, multiple sessions")
-kem = LNATKEM(LNAT128)
-pk, sk = kem.keygen()
-sessions = set()
-for _ in range(10):
-    ct, K = kem.encap(pk)
-    sessions.add(K)
-test("10 encapsulations produce 10 unique session keys", len(sessions) == 10)
+    sessions = {kem.encap(pk)[1] for _ in range(10)}
+    assert len(sessions) == 10
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Test 5 — Private key is exactly seed_size bytes
-# ──────────────────────────────────────────────────────────────────────────────
+def test_key_sizes():
+    kem = LNATKEM(LNAT128)
+    pk, sk = kem.keygen()
 
-print("\nTest 5 — Key sizes")
-kem = LNATKEM(LNAT128)
-pk, sk = kem.keygen()
-test(f"Private key is {LNAT128.seed_size} bytes",
-     sk.size_bytes() == LNAT128.seed_size)
-test("Public key is larger than private key",
-     pk.size_bytes() > sk.size_bytes())
+    assert sk.size_bytes() == LNAT128.seed_size
+    assert pk.size_bytes() > sk.size_bytes()
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Test 6 — Determinism: same seed + same nonce = same public key
-# ──────────────────────────────────────────────────────────────────────────────
+def test_determinism_same_seed_nonce_same_noiseless_output():
+    seed = os.urandom(32)
+    nonce = os.urandom(16)
+    seed_a = os.urandom(32)
 
-print("\nTest 6 — Determinism")
-import os
-from lnat_core import LNATAutomaton, generate_input_sequence
-from lnat_params import LNAT128
+    aut1 = LNATAutomaton(seed, LNAT128)
+    aut2 = LNATAutomaton(seed, LNAT128)
+    q0_a = aut1.derive_q0(nonce)
+    q0_b = aut2.derive_q0(nonce)
+    _, input_sequence = generate_input_sequence(LNAT128, seed_A=seed_a)
+    y1 = aut1.run_noiseless(q0_a, input_sequence)
+    y2 = aut2.run_noiseless(q0_b, input_sequence)
 
-seed   = os.urandom(32)
-nonce  = os.urandom(16)
-seed_A = os.urandom(32)
-
-aut1 = LNATAutomaton(seed, LNAT128)
-aut2 = LNATAutomaton(seed, LNAT128)
-q0_a = aut1.derive_q0(nonce)
-q0_b = aut2.derive_q0(nonce)
-_, A = generate_input_sequence(LNAT128, seed_A=seed_A)
-Y1 = aut1.run_noiseless(q0_a, A)
-Y2 = aut2.run_noiseless(q0_b, A)
-test("Same seed + nonce always produces same Y (noiseless)", Y1 == Y2)
+    assert y1 == y2
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Test 7 — Noise rate is approximately eta
-# ──────────────────────────────────────────────────────────────────────────────
+def test_noise_rate_approximately_eta():
+    seed = os.urandom(32)
+    nonce = os.urandom(16)
+    automaton = LNATAutomaton(seed, LNAT128)
+    q0 = automaton.derive_q0(nonce)
+    _, input_sequence = generate_input_sequence(LNAT128)
 
-print("\nTest 7 — Noise rate")
-import secrets as sec
-from lnat_core import LNATAutomaton, generate_input_sequence
+    y_clean = automaton.run_noiseless(q0, input_sequence)
+    y_noisy = automaton.run_noisy(q0, input_sequence, rng=secrets.SystemRandom())
 
-seed  = os.urandom(32)
-nonce = os.urandom(16)
-aut   = LNATAutomaton(seed, LNAT128)
-q0    = aut.derive_q0(nonce)
-_, A  = generate_input_sequence(LNAT128)
+    flips = sum(a != b for a, b in zip(y_clean, y_noisy))
+    actual_eta = flips / len(y_clean)
 
-Y_clean = aut.run_noiseless(q0, A)
-Y_noisy = aut.run_noisy(q0, A, rng=sec.SystemRandom())
-
-flips      = sum(a != b for a, b in zip(Y_clean, Y_noisy))
-actual_eta = flips / len(Y_clean)
-expected   = LNAT128.eta
-
-test(
-    f"Noise rate ~{expected:.0%} (got {actual_eta:.1%}, tolerance ±5%)",
-    abs(actual_eta - expected) < 0.05
-)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Summary
-# ──────────────────────────────────────────────────────────────────────────────
-
-passed = sum(1 for _, r in results if r)
-total  = len(results)
-print(f"\n{'='*50}")
-print(f"Results: {passed}/{total} tests passed")
-
-if passed == total:
-    print("All tests passed.")
-else:
-    print("SOME TESTS FAILED. See above.")
-    sys.exit(1)
+    assert abs(actual_eta - LNAT128.eta) < 0.05
