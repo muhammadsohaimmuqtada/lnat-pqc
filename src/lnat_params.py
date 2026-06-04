@@ -2,6 +2,9 @@
 # Parameter sets for LNAT-PQC
 # LNAT-128, LNAT-192, LNAT-256
 
+IMPLEMENTED_REPETITION_FACTOR = 7
+
+
 class LNATParams:
     """
     A parameter set for the LNAT scheme.
@@ -58,11 +61,11 @@ class LNATParams:
 
     def ciphertext_size_bytes(self):
         """
-        Ciphertext is approximately REPEAT * kappa bits.
-        Currently using REPEAT=7 in the reference implementation.
+        Exact ciphertext size for the current reference implementation:
+        ceil((REPEAT * kappa)/8), where REPEAT is the implemented
+        repetition-code factor in src/lnat_kem.py.
         """
-        REPEAT = 7
-        return (REPEAT * self.kappa + 7) // 8
+        return (IMPLEMENTED_REPETITION_FACTOR * self.kappa + 7) // 8
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -122,5 +125,5 @@ if __name__ == "__main__":
         print(f"  Public key size:         {p.public_key_size_bytes()} bytes")
         print(f"  Private key size:        {p.private_key_size_bytes()} bytes")
         print(f"  Ciphertext size:         {p.ciphertext_size_bytes()} bytes")
-    print("\nNote: Public key sizes are estimates pending BCH compression.")
-    print("Formal size analysis is an open problem.")
+    print("\nNote: Sizes above are exact for the current Python reference")
+    print("serialization format. Future BCH/format changes may differ.")

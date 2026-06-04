@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from lnat_params import LNAT128, LNAT192, ALL_PARAMS
+from lnat_params import LNAT128, LNAT192, LNAT256, ALL_PARAMS
 from lnat_kem    import LNATKEM
 
 PASS = "✓"
@@ -144,6 +144,41 @@ test(
     f"Noise rate ~{expected:.0%} (got {actual_eta:.1%}, tolerance ±5%)",
     abs(actual_eta - expected) < 0.05
 )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Test 8 — Round-trip correctness across LNAT-128/192/256
+# ──────────────────────────────────────────────────────────────────────────────
+
+print("\nTest 8 — Round-trip correctness for all parameter sets")
+for params in [LNAT128, LNAT192, LNAT256]:
+    kem = LNATKEM(params)
+    pk, sk = kem.keygen()
+    ct, K_enc = kem.encap(pk)
+    K_dec = kem.decap(sk, pk, ct)
+    test(f"{params.name}: Encap/Decap session key match", K_enc == K_dec)
+    test(f"{params.name}: Public key size estimator matches serialization",
+         pk.size_bytes() == params.public_key_size_bytes())
+    test(f"{params.name}: Ciphertext size estimator matches serialization",
+         ct.size_bytes() == params.ciphertext_size_bytes())
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Test 9 — Regression: LNAT-256 input generation uses full m=16 chunks
+# ──────────────────────────────────────────────────────────────────────────────
+
+print("\nTest 9 — LNAT-256 input-sequence regression (m=16)")
+from lnat_core import generate_input_sequence, prf
+
+seed_A = bytes.fromhex("00112233445566778899aabbccddeeff" * 2)
+_, A256 = generate_input_sequence(LNAT256, seed_A=seed_A)
+raw = prf(seed_A, b"input_sequence", LNAT256.T * 2)
+expected_prefix = [int.from_bytes(raw[i * 2:(i + 1) * 2], "big")
+                   for i in range(32)]
+
+test("LNAT-256 values are in [0, 2^16)", all(0 <= x < (1 << 16) for x in A256))
+test("LNAT-256 includes values above 255", any(x > 255 for x in A256))
+test("LNAT-256 first values use 2-byte chunks", A256[:32] == expected_prefix)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

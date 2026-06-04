@@ -96,6 +96,17 @@ pip install -r requirements.txt
 python tests/test_kem.py
 ```
 
+### B1 Milestone Scope (current)
+
+**Solid KEM first.** The current milestone focuses on making LNAT-KEM
+keygen/encap/decap run reliably across LNAT-128/192/256 with consistent
+parameter handling and serialization.
+
+Current limitations remain:
+- Research/prototype codebase, not production-ready
+- Repetition-code placeholder (BCH integration is still pending)
+- Formal CCA/security proofs and hardened constant-time implementation are ongoing work
+
 ---
 
 ## The Algorithm — Plain English
@@ -184,6 +195,7 @@ It covers:
 
 - [x] Hard problem defined
 - [x] KEM construction sketched
+- [x] B1 KEM stabilization (LNAT-128/192/256 round-trip reliability)
 - [x] Sign construction sketched
 - [x] Reference Python implementation
 - [x] Known answer tests
@@ -224,3 +236,10 @@ This is a research prototype. The security of LNAT has not been
 verified by external cryptographers. It should not be used to protect
 real data under any circumstances until it has undergone years of
 public scrutiny and formal analysis.
+
+## Running Tests
+
+```bash
+python tests/test_kem.py
+python tests/test_hardness.py
+```
