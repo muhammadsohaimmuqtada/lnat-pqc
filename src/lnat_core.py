@@ -88,9 +88,10 @@ class LazyTable:
 
         if key not in self._cache:
             # derive next state from seed + (state, input)
+            inp_bytes  = max(1, (self.params.m + 7) // 8)
             domain     = b"delta" + \
                          state.to_bytes(self.params.n // 8, "big") + \
-                         inp.to_bytes(self.params.m // 8 or 1, "big")
+                         inp.to_bytes(inp_bytes, "big")
             next_state = prf_int(self.seed, domain, self.params.n)
             self._cache[key] = next_state
 
@@ -233,7 +234,7 @@ def generate_input_sequence(params: LNATParams, seed_A: bytes = None) -> tuple:
         seed_A = os.urandom(32)
 
     # expand seed_A into T input values each in [0, 2^m)
-    bytes_per_val = (params.m + 7) // 8
+    bytes_per_val = max(1, (params.m + 7) // 8)
     raw = prf(seed_A, b"input_sequence", params.T * bytes_per_val)
     mask = (1 << params.m) - 1
     

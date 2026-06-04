@@ -12,13 +12,12 @@
 # NOTE: Reference implementation. Not for production use.
 
 import os
-import json
 import hashlib
 import secrets
 from dataclasses import dataclass
-from lnat_params import LNATParams, LNAT128, ALL_PARAMS
+from lnat_params import LNATParams, LNAT128, IMPLEMENTED_REPETITION_FACTOR
 from lnat_core  import (LNATAutomaton, generate_seed,
-                         generate_input_sequence, prf)
+                         generate_input_sequence)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -163,10 +162,39 @@ class LNATKEM:
         assert K_client == K_server  # shared secret established
     """
 
-    REPEAT = 7   # repetition code factor (replace with BCH in production)
+    REPEAT = IMPLEMENTED_REPETITION_FACTOR   # replace with BCH in production
 
     def __init__(self, params: LNATParams = LNAT128):
         self.params = params
+
+    def _assert_params_match(self, other: LNATParams, what: str):
+        if (other.n, other.m, other.T, other.kappa, other.seed_size) != \
+           (self.params.n, self.params.m, self.params.T,
+            self.params.kappa, self.params.seed_size):
+            raise ValueError(f"Parameter mismatch for {what}")
+
+    def _validate_public_key(self, pk: PublicKey):
+        self._assert_params_match(pk.params, "public key")
+        if len(pk.seed_A) != 32:
+            raise ValueError("Invalid public key: seed_A must be 32 bytes")
+        if len(pk.nonce) != 16:
+            raise ValueError("Invalid public key: nonce must be 16 bytes")
+        if len(pk.Y) != self.params.T:
+            raise ValueError("Invalid public key: Y length mismatch")
+        if any(bit not in (0, 1) for bit in pk.Y):
+            raise ValueError("Invalid public key: Y must be bits")
+
+    def _validate_private_key(self, sk: PrivateKey):
+        self._assert_params_match(sk.params, "private key")
+        if len(sk.seed) != self.params.seed_size:
+            raise ValueError("Invalid private key length")
+
+    def _validate_ciphertext(self, ct: Ciphertext):
+        expected_len = self.params.kappa * self.REPEAT
+        if len(ct.ct_bits) != expected_len:
+            raise ValueError("Invalid ciphertext length")
+        if any(bit not in (0, 1) for bit in ct.ct_bits):
+            raise ValueError("Invalid ciphertext: must be bits")
 
     # ── KeyGen ────────────────────────────────────────────────────────────────
 
@@ -213,6 +241,7 @@ class LNATKEM:
         (ciphertext, K) where K = H(r).
         """
         params = self.params
+        self._validate_public_key(pk)
 
         # 1. generate random session key r (kappa bits)
         r_bits = [secrets.randbits(1) for _ in range(params.kappa)]
@@ -249,6 +278,9 @@ class LNATKEM:
         returns K = H(r).
         """
         params = self.params
+        self._validate_private_key(sk)
+        self._validate_public_key(pk)
+        self._validate_ciphertext(ct)
 
         # 1. rebuild automaton from private seed
         automaton = LNATAutomaton(sk.seed, params)
