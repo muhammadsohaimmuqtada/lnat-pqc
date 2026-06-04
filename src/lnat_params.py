@@ -44,19 +44,25 @@ class LNATParams:
     def public_key_size_bytes(self):
         """
         Estimated public key size in bytes.
-        seed_A (32) + Y syndrome (~T * kappa / 8 compressed)
+        seed_A (32) + nonce (16) + length_prefix (4) + Y (ceil(T/8))
         """
         seed_A_bytes = 32
-        Y_bytes      = (self.T * self.kappa) // 8
-        return seed_A_bytes + Y_bytes
+        nonce_bytes  = 16
+        length_bytes = 4
+        Y_bytes      = (self.T + 7) // 8
+        return seed_A_bytes + nonce_bytes + length_bytes + Y_bytes
 
     def private_key_size_bytes(self):
         """Private key is just the seed."""
         return self.seed_size
 
     def ciphertext_size_bytes(self):
-        """Ciphertext is approximately T * kappa bits."""
-        return (self.T * self.kappa) // 8
+        """
+        Ciphertext is approximately REPEAT * kappa bits.
+        Currently using REPEAT=7 in the reference implementation.
+        """
+        REPEAT = 7
+        return (REPEAT * self.kappa + 7) // 8
 
 
 # ──────────────────────────────────────────────────────────────────────────────
