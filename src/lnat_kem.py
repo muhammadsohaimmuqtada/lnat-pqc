@@ -163,7 +163,7 @@ class LNATKEM:
         assert K_client == K_server  # shared secret established
     """
 
-    REPEAT = 5   # repetition code factor (replace with BCH in production)
+    REPEAT = 7   # repetition code factor (replace with BCH in production)
 
     def __init__(self, params: LNATParams = LNAT128):
         self.params = params

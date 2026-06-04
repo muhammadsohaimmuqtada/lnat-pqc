@@ -233,9 +233,15 @@ def generate_input_sequence(params: LNATParams, seed_A: bytes = None) -> tuple:
         seed_A = os.urandom(32)
 
     # expand seed_A into T input values each in [0, 2^m)
-    raw = prf(seed_A, b"input_sequence", params.T * 2)
+    bytes_per_val = (params.m + 7) // 8
+    raw = prf(seed_A, b"input_sequence", params.T * bytes_per_val)
     mask = (1 << params.m) - 1
-    A = [(raw[i] & mask) for i in range(params.T)]
+    
+    A = []
+    for i in range(params.T):
+        chunk = raw[i * bytes_per_val : (i + 1) * bytes_per_val]
+        val = int.from_bytes(chunk, "big") & mask
+        A.append(val)
 
     return seed_A, A
 
