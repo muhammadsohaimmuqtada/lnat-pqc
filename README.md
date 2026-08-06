@@ -1,245 +1,137 @@
 # LNAT-PQC
 
-**Learning Noisy Automata Transitions — Post-Quantum Cryptographic Primitive**
+**Learning Noisy Automata Transitions — experimental cryptography research**
 
-> ⚠️ **Research Proposal — Pre-Publication Draft**
-> This is not production software. Do not use in any real system.
-> The construction is under active development and has not received
-> external cryptographic review. Use for research and experimentation only.
+LNAT is a research prototype exploring whether noisy finite-state transition systems can support useful cryptographic constructions on constrained hardware.
 
----
+> **Pre-publication research prototype:** LNAT has not received independent cryptanalysis or external peer review. The repository does not establish a new accepted hardness assumption, a proven security level, or production-ready post-quantum security. Do not use it to protect real data.
 
-## What is LNAT?
+## Research question
 
-LNAT (Learning Noisy Automata Transitions) is a new computational hardness
-assumption for post-quantum cryptography. It is based on the infeasibility
-of recovering the transition function of a nonlinear finite automaton from
-noisy observations.
+The project studies a simple idea: if a secret state-transition process is observed only through noisy input/output traces, can recovering the hidden transition behavior be made computationally difficult enough to support a cryptographic construction?
 
-**The hard problem in one sentence:**
-Given many (input → noisy output) pairs from a secret machine,
-reconstruct the machine's internal rules.
+The repository contains reference code, experiments, parameter sketches, known-answer tests, and a draft paper used to investigate that question.
 
-This is computationally intractable because:
-- The rules table has 2^(n+m) entries at n=128 bits — more combinations
-  than atoms in the observable universe
-- The noise corrupts just enough output to prevent reconstruction
-- No known quantum algorithm provides more than a quadratic (Grover)
-  speedup — insufficient at n=256
+## Current scope
 
----
+The current milestone focuses on the KEM prototype and reproducible experimentation:
 
-## Why LNAT?
+- reference Python implementation
+- parameter sets used by the prototype
+- key generation / encapsulation / decapsulation round-trip tests
+- known-answer test vectors
+- basic performance experiments
+- documentation of open security questions
 
-| Property | Kyber (ML-KEM) | Picnic | LNAT (this work) |
-|---|---|---|---|
-| Hard problem | MLWE (lattice) | MPC satisfiability | LNAT (automata) |
-| Quantum resistance | Grover only | Grover only | Grover only |
-| NTT required | Yes | No | **No** |
-| Core operations | Poly. multiply | MPC simulation | **XOR + array lookup** |
-| Low-end hardware | Moderate | Poor | **Excellent** |
-| Public key size | ~1.1 KB | ~32 KB | ~200 bytes (est.) |
-| Maturity | NIST Standard | NIST Alternate | **Pre-proposal** |
+The signature construction remains exploratory.
 
-The key advantage: LNAT requires only bitwise XOR and array lookups.
-It runs identically on an 8-bit microcontroller and a 64-bit server
-without architectural modification.
+## Repository structure
 
----
-
-## Repository Structure
-
-```
+```text
 lnat-pqc/
-│
-├── README.md                  ← you are here
-├── SECURITY.md                ← responsible disclosure policy
-├── LICENSE                    ← MIT License
-│
-├── src/                       ← reference implementations
-│   ├── lnat_core.py           ← core automaton primitive
-│   ├── lnat_kem.py            ← Key Encapsulation Mechanism
-│   ├── lnat_sign.py           ← Digital Signature Scheme
-│   └── lnat_params.py         ← parameter sets (128/192/256)
-│
-├── tests/                     ← test suite
-│   ├── test_kem.py            ← KEM correctness tests
-│   ├── test_hardness.py       ← hard problem demonstration
-│   ├── test_vectors.py        ← known answer tests (KATs)
+├── src/
+│   ├── lnat_core.py
+│   ├── lnat_kem.py
+│   ├── lnat_sign.py
+│   └── lnat_params.py
+├── tests/
+│   ├── test_kem.py
+│   ├── test_hardness.py
+│   ├── test_vectors.py
 │   └── vectors/
-│       └── kat_128.json       ← test vectors for LNAT-128
-│
 ├── benchmarks/
-│   └── bench.py               ← performance benchmarks vs Kyber
-│
-├── paper/
-│   └── lnat_research_paper.docx  ← full research paper
-│
+│   └── bench.py
+├── reference/
+│   └── hard_problem_demo.py
 ├── docs/
-│   ├── CONSTRUCTION.md        ← detailed algorithm specification
-│   ├── SECURITY.md            ← security analysis and known attacks
-│   ├── PARAMETERS.md          ← parameter justification
-│   └── CONTRIBUTING.md        ← how to contribute
-│
-└── reference/
-    └── hard_problem_demo.py   ← standalone demo of the hard problem
+│   ├── CONSTRUCTION.md
+│   ├── SECURITY.md
+│   ├── PARAMETERS.md
+│   └── CONTRIBUTING.md
+├── paper/
+│   └── lnat_research_paper.docx
+└── README.md
 ```
 
----
-
-## Quick Start
+## Quick start
 
 ```bash
-git clone https://github.com/muhammadsohaimmuqtada/lnat-pqc
+git clone https://github.com/muhammadsohaimmuqtada/lnat-pqc.git
 cd lnat-pqc
 pip install -r requirements.txt
 python tests/test_kem.py
 ```
 
-### B1 Milestone Scope (current)
+Run the broader experimental checks with:
 
-**Solid KEM first.** The current milestone focuses on making LNAT-KEM
-keygen/encap/decap run reliably across LNAT-128/192/256 with consistent
-parameter handling and serialization.
-
-Current limitations remain:
-- Research/prototype codebase, not production-ready
-- Repetition-code placeholder (BCH integration is still pending)
-- Formal CCA/security proofs and hardened constant-time implementation are ongoing work
-
----
-
-## The Algorithm — Plain English
-
-### KeyGen
-```
-1. Generate a random 32-byte seed (your private key)
-2. Derive a secret transition table from the seed using AES
-3. Pick a random starting state q0
-4. Generate a random input sequence A
-5. Run the machine through A, collect outputs Y
-6. Public key = (A, Y)   Private key = seed
+```bash
+python tests/test_hardness.py
+python tests/test_vectors.py
 ```
 
-### Encap (Encrypt a session key)
-```
-1. Generate random session key r
-2. Mix r into the public outputs Y using XOR
-3. Send the result as ciphertext
-```
+## Construction overview
 
-### Decap (Decrypt)
-```
-1. Use seed to rerun the machine from q0 through A
-2. Recover the same Y
-3. XOR Y away from ciphertext
-4. Recover r using error correction
-```
+At a high level, the prototype derives a secret transition process from private key material, produces public observations from selected transition traces, and experiments with noisy recovery mechanisms for encapsulation and decapsulation.
 
----
+The construction is intentionally kept in reference form so that assumptions, serialization choices, error handling, and parameter behavior can be inspected and challenged.
 
-## Parameter Sets
+For the algorithm specification, see [docs/CONSTRUCTION.md](docs/CONSTRUCTION.md).
 
-| Level | n | m | T | Classical security | Quantum security |
-|---|---|---|---|---|---|
-| LNAT-128 | 128 | 8 | 512 | 128 bits | 64 bits |
-| LNAT-192 | 192 | 8 | 768 | 192 bits | 96 bits |
-| LNAT-256 | 256 | 16 | 1024 | 256 bits | 128 bits |
+## Open research problems
 
----
+The important work is not implementation polish; it is establishing whether the underlying idea is secure at all. Current open questions include:
 
-## Known Open Problems
+- formal definition of the computational problem
+- reduction or security proof for the KEM construction
+- attacks exploiting transition structure or observation leakage
+- parameter selection backed by cryptanalytic evidence
+- error-correction design
+- chosen-ciphertext security
+- side-channel behavior and constant-time implementation
+- independent cryptanalysis
 
-These are acknowledged weaknesses under active research:
+See [docs/SECURITY.md](docs/SECURITY.md) for the current security notes.
 
-1. **Table generation speed** — using lazy PRF tree to reduce
-   AES calls from O(T) to O(log n)
-2. **Formal security proof** — reduction to noisy MQ is sketched,
-   full proof is in progress
-3. **Side channel resistance** — bitsliced implementation needed
-   for constant-time table lookup
-4. **Signature scheme** — LNAT-Sign is a skeleton, abort
-   probability analysis not yet complete
+## Comparison with standardized PQC
 
-See [docs/SECURITY.md](docs/SECURITY.md) for full details.
+LNAT should not be presented as an alternative with security parity to standardized schemes such as ML-KEM. ML-KEM has undergone years of public cryptanalysis and standardization; LNAT has not.
 
----
+Any implementation-size or performance comparisons in this repository should therefore be interpreted as engineering measurements of prototypes, not evidence of equivalent cryptographic security.
 
 ## Contributing
 
-We actively want people to:
+The most useful contributions are skeptical ones:
 
-- **Try to break it** — cryptanalysis attempts are the most valuable contribution
-- **Implement it** — independent implementations in C, Rust, Go
-- **Formalize it** — help complete the security reduction proof
-- **Benchmark it** — real hardware measurements on embedded targets
+- cryptanalysis and counterexamples
+- independent implementations
+- parameter analysis
+- reproducible benchmarks
+- review of the proposed hardness assumptions
+- corrections to the draft construction or paper
 
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
----
+## Research paper
 
-## Research Paper
-
-The full research paper is in [paper/lnat_research_paper.docx](paper/).
-
-It covers:
-- Formal problem definition
-- Complete KEM and signature construction
-- Security analysis against classical and quantum attackers
-- Parameter justification
-- Comparison to ML-KEM and Picnic
-
----
+The current draft is stored in `paper/lnat_research_paper.docx`. It should be treated as a working research document rather than a peer-reviewed publication.
 
 ## Status
 
-- [x] Hard problem defined
-- [x] KEM construction sketched
-- [x] B1 KEM stabilization (LNAT-128/192/256 round-trip reliability)
-- [x] Sign construction sketched
-- [x] Reference Python implementation
-- [x] Known answer tests
-- [ ] Lazy PRF tree optimization
-- [ ] BCH error correction integration
+- [x] Reference construction implemented
+- [x] KEM round-trip experiments
+- [x] Known-answer test infrastructure
+- [x] Draft security notes
 - [ ] Formal security proof
-- [ ] C reference implementation
-- [ ] Side channel analysis
-- [ ] IACR ePrint submission
-- [ ] External cryptographic review
-
----
-
-## Citation
-
-If you use this work, please cite:
-
-```bibtex
-@misc{lnat2026,
-  title  = {LNAT: Learning Noisy Automata Transitions,
-             a Post-Quantum Cryptographic Primitive},
-  year   = {2026},
-  note   = {Pre-publication draft. \url{https://github.com/muhammadsohaimmuqtada/lnat-pqc}}
-}
-```
-
----
+- [ ] Robust error-correction design
+- [ ] Constant-time implementation
+- [ ] Independent implementation
+- [ ] External cryptanalysis
+- [ ] Peer-reviewed publication
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+MIT License.
 
----
+## Security disclaimer
 
-## Disclaimer
-
-This is a research prototype. The security of LNAT has not been
-verified by external cryptographers. It should not be used to protect
-real data under any circumstances until it has undergone years of
-public scrutiny and formal analysis.
-
-## Running Tests
-
-```bash
-python tests/test_kem.py
-python tests/test_hardness.py
-```
+This repository is experimental cryptography. Passing unit tests only demonstrates implementation consistency for the tested cases; it does not demonstrate cryptographic security.
