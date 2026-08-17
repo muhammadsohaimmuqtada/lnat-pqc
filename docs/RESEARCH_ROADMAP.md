@@ -38,7 +38,7 @@ Current findings:
 - `(1064,532,w=117)` crosses the current 128-bit **classical** estimator screen but is rejected as a post-quantum frontier point because the Groverized-Prange search exponent is only about `63.68` iteration bits.
 - `(1692,846,w=230)` clears the 128-bit Groverized-Prange baseline and correctness gate but is rejected by BJMMplus at `127.865290976502` modeled classical bits.
 - `(1694,847,w=230)` clears the currently implemented combined screen with BJMMplus at `128.408410067763`, Groverized-Prange at `128.025066962080` iteration bits, and conservative KEM failure `8.82707240635e-10`.
-- The Esser et al. Prange circuit-resource model for `(1694,847,w=230)` requires `721,643` logical qubits in the width-optimized layout or `1,438,205` in the depth-oriented full layout. The Table-2 width-optimized big-O depth scale has log2 value about `163.278`; this is not an exact gate-depth/security metric.
+- The Esser et al. Prange circuit-resource model for `(1694,847,w=230)` requires `721,643` logical qubits in the width-optimized layout or `1,438,205` in the depth-oriented full layout. The literal Table-2 width-optimized big-O depth scale has log2 value about `163.627`; this is not an exact gate-depth/security metric and deliberately excludes the separate `pi/4` Grover constant hidden by big-O.
 
 The `1694` point is only the smallest measured pass in the focused fixed-weight bracket. It is **not** a post-quantum security level or deployment recommendation because the quantum search screen is only a rejection baseline and stronger quantum ISD is not yet modeled finitely.
 
