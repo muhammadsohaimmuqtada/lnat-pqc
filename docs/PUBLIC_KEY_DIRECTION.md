@@ -20,6 +20,33 @@ The key property is public evaluability with a hidden decoding witness: the send
 
 `src/code_pke_reference.py` implements this mechanism only as a deliberately small research comparator. It is not an LNAT construction, not a KEM, not CCA-secure, and its toy parameters make no security claim.
 
+## LNAT-CODE-BRIDGE-0
+
+`src/lnat_code_bridge.py` is the first deliberately conservative integration experiment.
+
+It keeps the random-code noisy-decoding relation as the source of public-key asymmetry. LNAT-EXP2 is used only on the receiver/key-generation side to derive the hidden sparse witness from:
+
+- a compact LNAT secret seed;
+- a public nonce;
+- a public input-sequence seed;
+- the final state reached after the full LNAT transition schedule.
+
+The sender still encrypts using only the public noisy-code instance. No LNAT secret is needed for public encryption.
+
+This is a safe integration boundary because it does not claim that a secret-seeded automaton is publicly evaluable. It also does **not** make LNAT the security assumption: an attacker can ignore the LNAT seed and target the sparse code witness directly.
+
+### Entropy warning
+
+If the code witness has length `n` and exact weight `w`, its support contains only `C(n,w)` possibilities. Therefore its effective witness entropy is at most:
+
+```text
+log2(C(n,w))
+```
+
+regardless of whether the LNAT master seed is 256 bits. A large seed cannot increase security beyond the support size of the public hidden object it deterministically selects.
+
+The bridge exposes this value as `LNATCodeBridgeParams.witness_space_bits` so toy experiments cannot silently confuse seed length with security strength.
+
 ## What this tells us about LNAT
 
 The current LNAT state chain has a measurable sequential effect: changing one input causes later hidden states and output bits to diverge, unlike a direct per-step PRF baseline. That is a useful primitive property, but it is not asymmetry.
@@ -37,7 +64,12 @@ Simply publishing an LNAT trace, hashing it, or adding more noise does not creat
 
 ## Current candidate strategy
 
-The next research bridge should preserve a known public noisy-code relation as the asymmetry source while testing whether an LNAT-style sequential schedule can improve engineering or create a new analyzable relation. Any such candidate must initially be labelled as a comparator/experiment; security remains that of the underlying code problem until a new reduction exists.
+The bridge is now concrete enough to test two separate questions independently:
+
+1. does LNAT provide useful deterministic witness generation / schedule avalanche without introducing obvious bias;
+2. can a future construction expose an LNAT-derived public relation whose security is not merely inherited from the random-code comparator?
+
+Until question 2 has a rigorous answer, `LNAT-CODE-BRIDGE-0` remains a code-based research bridge and not an LNAT-native cryptosystem.
 
 ## Primary research references
 
