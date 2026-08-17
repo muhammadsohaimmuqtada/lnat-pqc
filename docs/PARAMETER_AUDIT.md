@@ -38,13 +38,13 @@ The repository reports
 log2(expected information-set trials)
 ```
 
-separately from the full witness-space size. This is **not a total operation count**: each trial still requires linear algebra, and modern information-set decoding variants can improve on basic Prange. It is nevertheless a much stronger sanity check than full witness enumeration.
+separately from the full witness-space size. This is **not a total operation count**: each trial still requires linear algebra, and modern information-set decoding variants can improve on basic Prange.
 
 For the deliberately tiny `(n=64,k=32,w=2)` bridge fixture, this model is only a few expected information-set trials even though the full support contains 2016 witnesses.
 
 `src/code_attacks.py` includes an actual Prange-style decoder for reduced parameters so the model is checked by executable attacks rather than documentation alone.
 
-## 3. Exact toy correctness model
+## 3. Exact reference correctness model
 
 For the current Alekhnovich-style comparator, an encryption of zero has the form
 
@@ -54,9 +54,47 @@ c_perp + e'
 
 where `c_perp` is orthogonal to the secret sparse witness `e`. The decryption inner product is therefore controlled by the parity of the intersection between the supports of `e` and `e'`.
 
-For fixed weights `w` and `t`, the probability of an odd intersection is computed exactly with the hypergeometric distribution. Given the repetition count and decision threshold, the bit-0 and bit-1 decryption failure probabilities then follow from exact binomial tails.
+For fixed weights `w` and `t`, the probability of an odd intersection is computed exactly with the hypergeometric distribution. Given the repetition count and decision threshold, the bit-0 and bit-1 decryption failure probabilities then follow from binomial tails.
+
+The frontier tooling chooses the decision cutoff that minimizes the larger of those two bit-failure probabilities, then finds the smallest repetition count meeting a requested failure ceiling.
 
 This is a correctness calculation for the reference model. It does not prove security.
+
+## 4. Necessary parameter frontier
+
+`experiments/code_parameter_frontier.py` combines the two filters above without turning them into a security claim.
+
+For a requested basic-Prange **trial floor**, it finds the smallest sparse witness weight that reaches that combinatorial trial count. It then chooses the smallest repetition count and best decision cutoff meeting a requested modeled correctness-failure ceiling.
+
+Example:
+
+```bash
+python experiments/code_parameter_frontier.py \
+  --n 256 --k 128 \
+  --prange-trial-bits 32 \
+  --error-weight 1 \
+  --failure-ceiling 1e-9
+```
+
+The current regression point is approximately:
+
+```text
+n = 256
+k = 128
+secret weight = 30
+basic-Prange expected trial bits >= 32
+repetitions = 183
+cutoff ones = 52
+modeled worst bit failure <= 1e-9
+```
+
+This means only that the point survives those **two necessary filters**. It is not a 32-bit security claim, because the Prange number omits per-trial linear-algebra cost and stronger ISD methods may be cheaper. It is also not a deployment recommendation.
+
+A grid can be generated with:
+
+```bash
+python experiments/code_parameter_frontier.py --grid
+```
 
 ## Tooling
 
@@ -64,12 +102,13 @@ This is a correctness calculation for the reference model. It does not prove sec
 python experiments/code_profile_audit.py
 python experiments/code_profile_audit.py \
   --n 256 --k 128 \
-  --secret-weight 30 --error-weight 8 \
+  --secret-weight 30 --error-weight 1 \
   --trivial-floor-bits 128 \
   --prange-trial-floor-bits 32
+python experiments/code_parameter_frontier.py --grid
 ```
 
-The requested floors are analysis filters only. Passing either one is not a security claim.
+The requested floors are analysis filters only. Passing them is not a security claim.
 
 ## Rule for future profiles
 
