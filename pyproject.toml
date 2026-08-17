@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lnat-pqc-research"
-version = "0.4.10a0"
+version = "0.4.11a0"
 description = "LNAT experimental primitive, cryptanalysis harness, and ML-KEM hybrid research profile"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -43,5 +43,6 @@ py-modules = [
   "code_quantum_isd",
   "code_post_quantum_frontier",
   "code_quantum_prange_resources",
+  "code_hybrid_prange_tradeoff",
 ]
 package-dir = { "" = "src" }
