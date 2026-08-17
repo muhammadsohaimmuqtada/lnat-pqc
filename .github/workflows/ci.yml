@@ -44,6 +44,8 @@ jobs:
         run: python attacks/statistical_probe.py --samples 8
       - name: Automaton avalanche ablation
         run: python experiments/avalanche_probe.py --samples 8
+      - name: Alekhnovich-style public-key comparator
+        run: python experiments/code_pke_probe.py --trials 16
       - name: Operational hybrid smoke test
         run: python src/lnat_hybrid_kem.py
       - name: Compile
