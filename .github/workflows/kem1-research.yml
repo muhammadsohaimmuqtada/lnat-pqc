@@ -1,0 +1,32 @@
+name: kem1-research-checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  kem1:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install research package
+        run: python -m pip install -e ".[pqc]"
+      - name: KEM-1 unit and attack tests
+        run: |
+          python -m unittest tests.test_lnat_code_kem1 -v
+          python -m unittest tests.test_code_kem1_attacks -v
+      - name: Full 128-bit KEM-1 round-trip and size probe
+        run: python experiments/lnat_code_kem1_probe.py --trials 2
+      - name: Public decapsulation attack against default KEM-1
+        run: python attacks/code_kem1_public_decapsulation.py
+      - name: Compile KEM-1 modules
+        run: python -m compileall -q src/code_segmented_outer.py src/lnat_code_kem1.py src/code_kem1_attacks.py tests/test_lnat_code_kem1.py tests/test_code_kem1_attacks.py
