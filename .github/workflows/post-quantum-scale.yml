@@ -15,11 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         point:
-          - "1400:700:225"
-          - "1600:800:229"
-          - "1800:900:232"
-          - "2000:1000:234"
-          - "2100:1050:235"
+          - "1650:825:230"
+          - "1700:850:231"
+          - "1750:875:231"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
