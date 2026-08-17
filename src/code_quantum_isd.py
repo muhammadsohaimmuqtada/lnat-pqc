@@ -4,17 +4,18 @@ The maintained syndrome-decoding estimator currently wired into this repository
 is a classical estimator. A post-quantum research profile must therefore be
 screened separately against quantum decoding attacks.
 
-This module deliberately implements only a conservative, easy-to-audit finite
-baseline: Grover/amplitude-amplification applied to Prange information-set
-search and to direct sparse-support enumeration. If a classical search has
-search-space exponent ``b``, the idealized Grover iteration exponent is
-``b / 2``.
+This module deliberately implements only a minimal, easy-to-audit finite
+rejection baseline: Grover/amplitude-amplification applied to Prange
+information-set search and to direct sparse-support enumeration. If a
+classical search has search-space exponent ``b``, the idealized Grover
+iteration exponent is ``b / 2``.
 
 The reported values are *quantum search iteration exponents*, not quantum gate
 counts and not security levels. Reversible linear algebra, memory, circuit
 width/depth, constants, and more advanced quantum ISD algorithms are outside
 this tiny model. In particular, passing this screen is necessary but nowhere
-near sufficient for a post-quantum security claim.
+near sufficient for a post-quantum security claim, while failing it is enough
+to reject a candidate under this public attack path.
 
 References motivating the baseline include Bernstein's "Grover vs. McEliece"
 (PQCrypto 2010) and Kachigar--Tillich's "Quantum Information Set Decoding
