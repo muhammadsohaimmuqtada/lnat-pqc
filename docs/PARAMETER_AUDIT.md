@@ -1,22 +1,16 @@
 # Code-profile parameter audit
 
-This repository does not assign a security level to the random-code comparator, `LNAT-CODE-BRIDGE-0`, or `LNAT-CODE-KEM-0`.
+This repository does not assign a security level to the random-code comparator, `LNAT-CODE-BRIDGE-0`, or the research LNAT code KEMs.
 
-Before a code-based research profile is even worth deeper cryptanalysis, several necessary checks must be reported separately.
+Before a code-based research profile is even worth deeper cryptanalysis, necessary attack and correctness checks must be reported separately.
 
 ## 1. Full sparse-witness enumeration ceiling
 
-For an exact-weight hidden witness of length `n` and weight `w`, there are `C(n,w)` possible supports. Therefore
+For an exact-weight hidden witness of length `n` and weight `w`, there are `C(n,w)` possible supports. Therefore `log2(C(n,w))` is only a ceiling against basic full-support enumeration.
 
-```text
-log2(C(n,w))
-```
+A 256-bit LNAT master seed cannot provide 256 bits of security if it deterministically maps into a much smaller public hidden-witness space.
 
-is only a ceiling against basic full-support enumeration.
-
-A 256-bit LNAT master seed cannot provide 256 bits of security if it deterministically maps into a public hidden witness whose support is much smaller.
-
-## 2. Prange information-set decoding baseline
+## 2. Prange information-set baseline
 
 For a binary `[n,k]` code and weight-`w` error, the basic Prange combinatorial model has expected information-set count
 
@@ -26,49 +20,61 @@ C(n,w) / C(n-k,w)
 
 when `w <= n-k`.
 
-The repository reports `log2(expected information-set trials)` separately from full witness-space size. This is **not** a total operation count: each trial contains linear algebra and stronger ISD variants can improve on basic Prange.
+The repository reports `log2(expected information-set trials)` separately from full witness-space size. This is not a total operation count.
 
-`src/code_attacks.py` includes an executable Prange-style decoder for reduced parameters.
+## 3. Stern collision/list baseline
 
-## 3. Exact per-bit correctness model
+The active frontier now also evaluates each candidate with the executable Stern-style collision model in `src/code_stern.py`.
 
-For the Alekhnovich-style comparator, an encryption of zero contains a dual-code word plus a fresh fixed-weight error. The dual-code component is orthogonal to the receiver's sparse witness, so the remaining inner-product error is controlled by the parity of the intersection of the two fixed-weight supports.
+That model explicitly accounts for:
 
-The repository computes that probability exactly with the hypergeometric distribution, then computes bit-0 and bit-1 failure probabilities with binomial tails.
+- the useful information-set probability for `(p,l)`;
+- left/right list sizes;
+- expected projection collisions;
+- a naive GF(2) elimination term;
+- list/collision processing work; and
+- list memory.
 
-## 4. Full-KEM correctness composition
+The resulting `stern-modeled-operation-bits` are **reference-model operation bits**, not a proven security level. They are deliberately kept separate from Prange trial bits because the units differ.
 
-A small **per-bit** failure probability is not the KEM failure probability.
+## 4. Exact per-bit correctness model
 
-`LNAT-CODE-KEM-0` encrypts an entire random seed bit-by-bit. If the bit-0 and bit-1 decoding failure probabilities are `p0` and `p1`, then for a uniformly random encapsulated bit the modeled error probability is
+For the Alekhnovich-style comparator, an encryption of zero contains a dual-code word plus a fresh fixed-weight error. The dual-code component is orthogonal to the receiver's sparse witness, so the remaining inner-product error is controlled by the parity of the intersection of two fixed-weight supports.
+
+The repository computes that probability exactly, then computes bit-0 and bit-1 failure probabilities with binomial tails.
+
+## 5. Full-KEM correctness composition
+
+A small per-bit failure probability is not the KEM failure probability.
+
+For a uniformly random encapsulated bit,
 
 ```text
 p_avg = (p0 + p1) / 2
 ```
 
-and, under the reference model's independent fresh encryption randomness, an `m`-bit encapsulated seed has modeled failure probability
+and under the reference model's independent fresh encryption randomness, an `m`-bit seed has modeled failure probability
 
 ```text
 1 - (1 - p_avg)^m.
 ```
 
-The audit also reports the more conservative union bound
+The audit also reports the conservative union bound
 
 ```text
 m * max(p0, p1)
 ```
 
-clamped to 1. The necessary frontier now uses this conservative bound as its correctness gate.
+clamped to 1. The active frontier uses this conservative bound as its correctness gate.
 
-This matters materially. The old `(n=256,k=128,w=30)` regression with 183 repetitions achieved about `1e-9` **per bit**, but for a 128-bit encapsulated seed that composes to roughly `1.1e-7` modeled seed failure. It therefore does not meet a `1e-9` KEM-level target.
+## 6. Attack-aware parameter frontier
 
-## 5. Necessary parameter frontier
+`experiments/code_parameter_frontier.py` now requires all of these simultaneously:
 
-`experiments/code_parameter_frontier.py` now combines:
-
-1. a requested basic-Prange **trial floor**;
-2. an encapsulated-seed length; and
-3. a requested conservative **full-KEM failure ceiling**.
+1. a requested Prange expected-trial floor;
+2. a requested Stern reference-operation floor;
+3. an encapsulated-seed length; and
+4. a requested conservative full-KEM failure ceiling.
 
 Example:
 
@@ -76,27 +82,30 @@ Example:
 python experiments/code_parameter_frontier.py \
   --n 256 --k 128 \
   --prange-trial-bits 32 \
+  --stern-op-bits 64 \
   --error-weight 1 \
   --encapsulated-bits 128 \
-  --kem-failure-ceiling 1e-9
+  --kem-failure-ceiling 1e-9 \
+  --max-repetitions 450
 ```
 
-The current full-KEM regression point is:
+The deterministic research regression is now:
 
 ```text
 n = 256
 k = 128
-secret weight = 30
-basic-Prange expected trial bits >= 32
+secret weight = 48
+Prange expected trial bits >= 32
+Stern reference-operation bits >= 64
+Stern best modeled p = 3
+Stern best modeled l = 12
 encapsulated seed = 128 bits
-repetitions = 233
-cutoff ones = 66
+repetitions = 394
+cutoff ones = 131
 conservative full-KEM failure bound <= 1e-9
 ```
 
-The older 183-repetition point is retained only as a regression for the legacy per-bit calculation.
-
-This means only that the 233-repetition point survives these **necessary filters**. It is not a 32-bit security claim, because the Prange number omits per-trial operation cost and stronger ISD methods may be cheaper. It is not a deployment recommendation.
+The previous `w=30`, 233-repetition point remains useful as a historical Prange/full-KEM correctness regression, but it does not pass the new 64-bit Stern reference-operation floor. This does **not** mean the new `w=48` point has 64 bits of cryptographic security. It only survives the attack models currently implemented in this repository.
 
 ## Tooling
 
@@ -104,6 +113,8 @@ This means only that the 233-repetition point survives these **necessary filters
 python experiments/code_profile_audit.py
 python experiments/code_parameter_frontier.py
 python experiments/code_parameter_frontier.py --grid
+python experiments/lee_brickell_probe.py
+python experiments/stern_probe.py
 ```
 
 ## Rule for future profiles
@@ -111,8 +122,9 @@ python experiments/code_parameter_frontier.py --grid
 No future bridge/KEM profile should be presented as a serious candidate until it has, at minimum:
 
 1. an explicit full witness-space audit;
-2. basic Prange/ISD work estimates;
-3. an exact or conservative **full-KEM** correctness/failure analysis;
-4. executable attacks on reduced parameters;
-5. stronger ISD/BKW-style analysis where applicable;
-6. a clearly stated security assumption or reduction target.
+2. executable Prange, Lee-Brickell, and Stern-style reduced attacks;
+3. separate attack-cost metrics with explicit time/memory models;
+4. an exact or conservative full-KEM correctness/failure analysis;
+5. stronger Dumer/BJMM-style analysis before any security-level claim;
+6. independent cryptanalysis; and
+7. a clearly stated security assumption or reduction target.
