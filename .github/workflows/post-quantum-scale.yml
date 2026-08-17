@@ -15,8 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         point:
-          - "1696:848:230"
-          - "1698:849:231"
+          - "1688:844:230"
+          - "1690:845:230"
+          - "1692:846:230"
+          - "1694:847:230"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
