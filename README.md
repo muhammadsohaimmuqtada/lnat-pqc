@@ -2,136 +2,112 @@
 
 **Learning Noisy Automata Transitions — experimental cryptography research**
 
-LNAT is a research prototype exploring whether noisy finite-state transition systems can support useful cryptographic constructions on constrained hardware.
+LNAT studies whether a secret, seed-derived finite-state transition process observed through noisy traces yields a useful computational learning problem.
 
-> **Pre-publication research prototype:** LNAT has not received independent cryptanalysis or external peer review. The repository does not establish a new accepted hardness assumption, a proven security level, or production-ready post-quantum security. Do not use it to protect real data.
+> **Security status:** no cryptographic security is claimed. The original KEM-v1 construction is publicly broken and is retained only as a reproducible negative result. Do not use this repository to protect real data.
 
-## Research question
+## Research reset
 
-The project studies a simple idea: if a secret state-transition process is observed only through noisy input/output traces, can recovering the hidden transition behavior be made computationally difficult enough to support a cryptographic construction?
+The project has been reset to a defensible starting point:
 
-The repository contains reference code, experiments, parameter sketches, known-answer tests, and a draft paper used to investigate that question.
+- the LNAT primitive is specified independently of any KEM claim;
+- parameter names describe experiment sizes, not security levels;
+- the KEM-v1 confidentiality break is documented and tested;
+- the historical KEM cannot be instantiated without an explicit `allow_broken=True` acknowledgement;
+- tests separate implementation correctness from cryptanalytic evidence;
+- security documentation does not claim NIST levels, IND-CPA, IND-CCA, or post-quantum strength.
 
-## Current scope
+## Primitive under study
 
-The current milestone focuses on the KEM prototype and reproducible experimentation:
+For profile parameters `(n, m, T, eta)` and a secret seed `s`, LNAT-EXP1 uses:
 
-- reference Python implementation
-- parameter sets used by the prototype
-- key generation / encapsulation / decapsulation round-trip tests
-- known-answer test vectors
-- basic performance experiments
-- documentation of open security questions
+```text
+q_0 = Q0_s(nonce)
+q_t = Delta_s(q_{t-1}, a_t)
+z_t = LSB(q_t)
+y_t = z_t XOR e_t,   e_t ~ Bernoulli(eta)
+```
 
-The signature construction remains exploratory.
+`Delta_s` and `Q0_s` are instantiated with domain-separated HMAC-SHA256 in the reference code. The public trace is generated from a public input-sequence seed and a public nonce.
+
+This is a **research object**, not an accepted hardness assumption. See [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
+
+## Known break of KEM-v1
+
+The archived KEM-v1 formed its ciphertext by XORing an encoded secret with `pk.Y`. Because `pk.Y` is public, anyone can remove the same mask and recover the encapsulated secret. No recovery of the automaton state or transition function is required.
+
+See [`docs/KNOWN_BREAKS.md`](docs/KNOWN_BREAKS.md) and [`attacks/public_recovery_v1.py`](attacks/public_recovery_v1.py).
 
 ## Repository structure
 
 ```text
 lnat-pqc/
 ├── src/
-│   ├── lnat_core.py
-│   ├── lnat_kem.py
-│   ├── lnat_sign.py
-│   └── lnat_params.py
+│   ├── lnat_core.py          # LNAT-EXP1 primitive
+│   ├── lnat_params.py        # experimental parameter profiles
+│   └── lnat_kem.py           # archived BROKEN KEM-v1
 ├── tests/
-│   ├── test_kem.py
-│   ├── test_hardness.py
-│   ├── test_vectors.py
-│   └── vectors/
-├── benchmarks/
-│   └── bench.py
-├── reference/
-│   └── hard_problem_demo.py
+│   ├── test_core.py
+│   └── test_broken_kem.py
+├── attacks/
+│   └── public_recovery_v1.py
+├── experiments/
+│   └── README.md
 ├── docs/
-│   ├── CONSTRUCTION.md
+│   ├── SPECIFICATION.md
 │   ├── SECURITY.md
-│   ├── PARAMETERS.md
+│   ├── KNOWN_BREAKS.md
+│   ├── RESEARCH_ROADMAP.md
 │   └── CONTRIBUTING.md
 ├── paper/
-│   └── lnat_research_paper.docx
+│   ├── LNAT_Research_Paper.docx
+│   └── README.md
+├── pyproject.toml
 └── README.md
 ```
 
-## Quick start
+## Run the reference checks
 
 ```bash
-git clone https://github.com/muhammadsohaimmuqtada/lnat-pqc.git
-cd lnat-pqc
-pip install -r requirements.txt
-python tests/test_kem.py
+python -m unittest discover -s tests -v
+python attacks/public_recovery_v1.py
+python -m compileall -q src tests attacks
 ```
 
-Run the broader experimental checks with:
+The attack script is expected to print `recovered =True`. That result confirms the repository is accurately reproducing the known KEM-v1 break.
 
-```bash
-python tests/test_hardness.py
-python tests/test_vectors.py
-```
+## Current parameter profiles
 
-## Construction overview
+The compatibility symbols `LNAT128`, `LNAT192`, and `LNAT256` remain in code, but their profile names are now:
 
-At a high level, the prototype derives a secret transition process from private key material, produces public observations from selected transition traces, and experiments with noisy recovery mechanisms for encapsulation and decapsulation.
+- `LNAT-n128-exp1`
+- `LNAT-n192-exp1`
+- `LNAT-n256-exp1`
 
-The construction is intentionally kept in reference form so that assumptions, serialization choices, error handling, and parameter behavior can be inspected and challenged.
+These labels refer to **state size only**. They do not mean 128/192/256-bit security and do not map to NIST security categories.
 
-For the algorithm specification, see [docs/CONSTRUCTION.md](docs/CONSTRUCTION.md).
+## What counts as progress now
 
-## Open research problems
+The next milestone is not a faster KEM. It is evidence about the primitive:
 
-The important work is not implementation polish; it is establishing whether the underlying idea is secure at all. Current open questions include:
+1. define attack games precisely;
+2. build exhaustive attacks for tiny `n`;
+3. build SAT/SMT recovery models;
+4. develop statistical distinguishers;
+5. measure sample complexity and parameter sensitivity;
+6. determine whether any asymmetric/trapdoor mechanism can be justified;
+7. only then propose a KEM-v2 construction.
 
-- formal definition of the computational problem
-- reduction or security proof for the KEM construction
-- attacks exploiting transition structure or observation leakage
-- parameter selection backed by cryptanalytic evidence
-- error-correction design
-- chosen-ciphertext security
-- side-channel behavior and constant-time implementation
-- independent cryptanalysis
+A future KEM must include an operation available to the public-key holder that creates a secret recoverable by the private-key holder but not by an observer with the same public data. KEM-v1 did not satisfy that requirement.
 
-See [docs/SECURITY.md](docs/SECURITY.md) for the current security notes.
+## Paper status
 
-## Comparison with standardized PQC
-
-LNAT should not be presented as an alternative with security parity to standardized schemes such as ML-KEM. ML-KEM has undergone years of public cryptanalysis and standardization; LNAT has not.
-
-Any implementation-size or performance comparisons in this repository should therefore be interpreted as engineering measurements of prototypes, not evidence of equivalent cryptographic security.
+`paper/LNAT_Research_Paper.docx` predates this cryptanalytic reset. It is retained as historical research material and is **not authoritative** for the current construction or security status. See [`paper/README.md`](paper/README.md).
 
 ## Contributing
 
-The most useful contributions are skeptical ones:
-
-- cryptanalysis and counterexamples
-- independent implementations
-- parameter analysis
-- reproducible benchmarks
-- review of the proposed hardness assumptions
-- corrections to the draft construction or paper
-
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
-
-## Research paper
-
-The current draft is stored in `paper/lnat_research_paper.docx`. It should be treated as a working research document rather than a peer-reviewed publication.
-
-## Status
-
-- [x] Reference construction implemented
-- [x] KEM round-trip experiments
-- [x] Known-answer test infrastructure
-- [x] Draft security notes
-- [ ] Formal security proof
-- [ ] Robust error-correction design
-- [ ] Constant-time implementation
-- [ ] Independent implementation
-- [ ] External cryptanalysis
-- [ ] Peer-reviewed publication
+Reproducible attacks, counterexamples, formal definitions, independent implementations, and negative results are particularly valuable. See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
 
 ## License
 
 MIT License.
-
-## Security disclaimer
-
-This repository is experimental cryptography. Passing unit tests only demonstrates implementation consistency for the tested cases; it does not demonstrate cryptographic security.
