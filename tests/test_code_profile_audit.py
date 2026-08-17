@@ -32,6 +32,15 @@ class CodeProfileAuditTests(unittest.TestCase):
         self.assertFalse(audit.meets_trivial_enumeration_floor(16))
         self.assertTrue(audit.meets_trivial_enumeration_floor(10))
 
+    def test_prange_model_exposes_stronger_public_attack(self):
+        audit = audit_code_profile(TOY)
+        expected = math.comb(64, 2) / math.comb(32, 2)
+        self.assertAlmostEqual(audit.prange_expected_information_sets, expected)
+        self.assertAlmostEqual(audit.prange_expected_trial_bits, math.log2(expected))
+        self.assertLess(audit.prange_expected_trial_bits, 3.0)
+        self.assertFalse(audit.meets_prange_trial_floor(8))
+        self.assertTrue(audit.meets_prange_trial_floor(2))
+
     def test_fixed_weight_odd_intersection_probability(self):
         # For w=t=2, odd intersection means exactly one common coordinate.
         expected = (math.comb(2, 1) * math.comb(62, 1)) / math.comb(64, 2)
@@ -60,6 +69,8 @@ class CodeProfileAuditTests(unittest.TestCase):
         audit = audit_code_profile(TOY)
         with self.assertRaises(ValueError):
             audit.meets_trivial_enumeration_floor(-1)
+        with self.assertRaises(ValueError):
+            audit.meets_prange_trial_floor(-1)
         with self.assertRaises(ValueError):
             audit.meets_failure_ceiling(1.1)
 
