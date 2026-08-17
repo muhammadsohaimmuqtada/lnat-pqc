@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lnat-pqc-research"
-version = "0.4.7a0"
+version = "0.4.8a0"
 description = "LNAT experimental primitive, cryptanalysis harness, and ML-KEM hybrid research profile"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,6 +32,7 @@ py-modules = [
   "code_attacks",
   "code_profile_audit",
   "code_attack_frontier",
+  "code_modern_frontier",
   "code_channel_audit",
   "code_outer_channel",
   "lnat_code_kem",
