@@ -116,18 +116,30 @@ def depth_optimized_qubits(n: int, k: int) -> int:
 
 
 def width_optimized_depth_scale_bits(n: int, classical_trial_bits: float) -> float:
-    """Log2 of Table 2's ``n^3 log(n)/sqrt(q)`` asymptotic depth scale.
+    """Log2 of Table 2's literal ``n^3 log(n)/sqrt(q)`` asymptotic scale.
 
-    The ``sqrt(q)`` factor uses the Prange success probability.  This function
-    uses log base 2 consistently; changing the logarithm base only changes an
-    asymptotic constant, which is already hidden by the paper's big-O notation.
+    The paper states this expression in big-O notation.  We therefore keep its
+    ``1/sqrt(q)`` term literal and do *not* inject the separate ``pi/4`` Grover
+    constant used by :func:`idealized_grover_iteration_bits`.  Multiplicative
+    constants are already hidden by big-O.
+
+    Log base 2 is used consistently; changing the logarithm base changes only
+    another multiplicative asymptotic constant.
     """
     if not isinstance(n, int):
         raise TypeError("n must be an integer")
     if n <= 1:
         raise ValueError("n must be greater than 1")
-    grover_bits = idealized_grover_iteration_bits(classical_trial_bits)
-    return grover_bits + 3.0 * math.log2(n) + math.log2(math.log2(n))
+    if not isinstance(classical_trial_bits, (int, float)) or isinstance(
+        classical_trial_bits, bool
+    ):
+        raise TypeError("classical_trial_bits must be a real number")
+    trial_bits = float(classical_trial_bits)
+    if math.isnan(trial_bits) or trial_bits < 0:
+        raise ValueError("classical_trial_bits must be non-negative")
+    if math.isinf(trial_bits):
+        return math.inf
+    return 0.5 * trial_bits + 3.0 * math.log2(n) + math.log2(math.log2(n))
 
 
 def assess_quantum_prange_resources(
