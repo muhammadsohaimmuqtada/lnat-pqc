@@ -9,7 +9,11 @@ from code_pke_reference import CodePKEParams
 from code_profile_audit import (
     audit_code_profile,
     fixed_weight_intersection_odd_probability,
+    minimum_repetitions_for_failure,
+    minimum_weight_for_prange_trial_floor,
     minimum_weight_for_trivial_floor,
+    optimal_decision_for_repetitions,
+    screen_necessary_candidate,
     sparse_witness_enumeration_bits,
 )
 
@@ -42,7 +46,6 @@ class CodeProfileAuditTests(unittest.TestCase):
         self.assertTrue(audit.meets_prange_trial_floor(2))
 
     def test_fixed_weight_odd_intersection_probability(self):
-        # For w=t=2, odd intersection means exactly one common coordinate.
         expected = (math.comb(2, 1) * math.comb(62, 1)) / math.comb(64, 2)
         self.assertAlmostEqual(
             fixed_weight_intersection_odd_probability(64, 2, 2),
@@ -65,6 +68,61 @@ class CodeProfileAuditTests(unittest.TestCase):
         if weight > 0:
             self.assertLess(sparse_witness_enumeration_bits(256, weight - 1), 128)
 
+    def test_minimum_weight_for_prange_trial_floor(self):
+        self.assertEqual(minimum_weight_for_prange_trial_floor(256, 128, 32), 30)
+        self.assertLess(
+            audit_code_profile(
+                CodePKEParams(
+                    n=256,
+                    k=128,
+                    secret_weight=29,
+                    encryption_error_weight=1,
+                    repetitions=1,
+                    zero_threshold=0.25,
+                )
+            ).prange_expected_trial_bits,
+            32,
+        )
+
+    def test_optimal_decision_rule_for_known_frontier_point(self):
+        p_zero = fixed_weight_intersection_odd_probability(256, 30, 1)
+        self.assertEqual(p_zero, 30 / 256)
+        decision = optimal_decision_for_repetitions(p_zero, 183)
+        self.assertEqual(decision.cutoff_ones, 52)
+        self.assertAlmostEqual(decision.threshold, 52 / 183)
+        self.assertLess(decision.worst_failure_probability, 1e-9)
+
+    def test_minimum_repetitions_for_failure_known_point(self):
+        p_zero = 30 / 256
+        decision = minimum_repetitions_for_failure(
+            p_zero,
+            1e-9,
+            max_repetitions=256,
+        )
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.repetitions, 183)
+        self.assertEqual(decision.cutoff_ones, 52)
+        self.assertLessEqual(decision.worst_failure_probability, 1e-9)
+
+    def test_screen_necessary_candidate_known_point(self):
+        candidate = screen_necessary_candidate(
+            n=256,
+            k=128,
+            prange_trial_floor_bits=32,
+            encryption_error_weight=1,
+            failure_ceiling=1e-9,
+            max_repetitions=256,
+        )
+        self.assertIsNotNone(candidate)
+        assert candidate is not None
+        self.assertEqual(candidate.secret_weight, 30)
+        self.assertGreaterEqual(candidate.prange_expected_trial_bits, 32)
+        self.assertEqual(candidate.repetitions, 183)
+        self.assertEqual(candidate.cutoff_ones, 52)
+        self.assertLessEqual(candidate.worst_failure_probability, 1e-9)
+        self.assertGreater(candidate.full_witness_enumeration_bits, 32)
+
     def test_invalid_policy_values_rejected(self):
         audit = audit_code_profile(TOY)
         with self.assertRaises(ValueError):
@@ -73,6 +131,16 @@ class CodeProfileAuditTests(unittest.TestCase):
             audit.meets_prange_trial_floor(-1)
         with self.assertRaises(ValueError):
             audit.meets_failure_ceiling(1.1)
+        with self.assertRaises(ValueError):
+            minimum_repetitions_for_failure(0.1, 0.0)
+        with self.assertRaises(ValueError):
+            screen_necessary_candidate(
+                n=64,
+                k=64,
+                prange_trial_floor_bits=8,
+                encryption_error_weight=1,
+                failure_ceiling=1e-6,
+            )
 
 
 if __name__ == "__main__":
