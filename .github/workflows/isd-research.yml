@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: ISD/frontier unit tests
-        run: python -m unittest tests.test_code_isd tests.test_code_stern tests.test_code_sd_estimator tests.test_code_modern_frontier tests.test_code_modern_frontier_real tests.test_code_quantum_isd tests.test_code_post_quantum_frontier tests.test_code_quantum_prange_resources tests.test_code_hybrid_prange_tradeoff -v
+        run: python -m unittest tests.test_code_isd tests.test_code_stern tests.test_code_sd_estimator tests.test_code_modern_frontier tests.test_code_modern_frontier_real tests.test_code_quantum_isd tests.test_code_post_quantum_frontier tests.test_code_quantum_prange_resources tests.test_code_hybrid_prange_tradeoff tests.test_code_punctured_combined_hybrid -v
       - name: Executable Lee-Brickell probe
         run: python experiments/lee_brickell_probe.py
       - name: Executable Stern collision probe
@@ -30,8 +30,12 @@ jobs:
         run: python experiments/quantum_prange_resource_probe.py --n 1694 --k 847 --weight 230 --expect-width-qubits 721643 --expect-depth-qubits 1438205
       - name: Reproduce Hybrid-Prange constrained-memory tradeoff
         run: python experiments/hybrid_prange_tradeoff_probe.py --n 1694 --k 847 --weight 230 --guess-zeros 0 --guess-zeros 678 --guess-zeros 762 --guess-zeros 847
+      - name: Reproduce Punctured-Hybrid proof cost
+        run: python experiments/punctured_combined_hybrid_probe.py --n 1694 --k 847 --weight 230 --guess-zeros 0 --omit 678
+      - name: Reproduce Combined-Hybrid proof cost
+        run: python experiments/punctured_combined_hybrid_probe.py --n 1694 --k 847 --weight 230 --guess-zeros 582 --omit 306
       - name: Compile ISD/frontier modules
-        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py src/code_modern_frontier.py src/code_quantum_isd.py src/code_post_quantum_frontier.py src/code_quantum_prange_resources.py src/code_hybrid_prange_tradeoff.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py tests/test_code_modern_frontier.py tests/test_code_modern_frontier_real.py tests/test_code_quantum_isd.py tests/test_code_post_quantum_frontier.py tests/test_code_quantum_prange_resources.py tests/test_code_hybrid_prange_tradeoff.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py experiments/modern_isd_scale_probe.py experiments/modern_frontier_probe.py experiments/quantum_isd_probe.py experiments/quantum_prange_resource_probe.py experiments/hybrid_prange_tradeoff_probe.py
+        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py src/code_modern_frontier.py src/code_quantum_isd.py src/code_post_quantum_frontier.py src/code_quantum_prange_resources.py src/code_hybrid_prange_tradeoff.py src/code_punctured_combined_hybrid.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py tests/test_code_modern_frontier.py tests/test_code_modern_frontier_real.py tests/test_code_quantum_isd.py tests/test_code_post_quantum_frontier.py tests/test_code_quantum_prange_resources.py tests/test_code_hybrid_prange_tradeoff.py tests/test_code_punctured_combined_hybrid.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py experiments/modern_isd_scale_probe.py experiments/modern_frontier_probe.py experiments/quantum_isd_probe.py experiments/quantum_prange_resource_probe.py experiments/hybrid_prange_tradeoff_probe.py experiments/punctured_combined_hybrid_probe.py
 
   upstream-modern-frontier:
     runs-on: ubuntu-latest
