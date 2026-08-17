@@ -23,14 +23,35 @@ EXP1 published `LSB(q_t)`, a fixed state coordinate. EXP2 uses a keyed, step-sep
 
 `LNAT-CODE-BRIDGE-0` does not make the secret-seeded LNAT automaton publicly evaluable. Instead it derives a sparse secret witness for an Alekhnovich-style random-code public relation. Consequently the relevant public attack problem is random binary syndrome decoding.
 
-The repository maintains two separate screens:
+The repository maintains separate screens for different evidence classes:
 
-- a **classical** finite-parameter screen using pinned `cryptographic-estimators==2.1.1` plus direct support enumeration; and
-- a **quantum-search baseline** that applies Grover/amplitude-amplification to Prange search and direct support enumeration.
+- a **classical** finite-parameter screen using pinned `cryptographic-estimators==2.1.1` plus direct support enumeration;
+- a **quantum-search rejection baseline** that applies Grover/amplitude-amplification to Prange search and direct support enumeration; and
+- the conservative full-KEM correctness/failure bound.
 
-The classical `(1064,532,w=117)` regression point reaches about `128.612` modeled classical attack bits under the pinned estimator, but its transparent Groverized-Prange search exponent is only about `63.679` oracle iterations in log2 units. It is therefore rejected as a post-quantum parameter candidate.
+`src/code_post_quantum_frontier.py` requires these gates simultaneously while keeping their units separate.
 
-That `63.679` number is not a claim of exact quantum gate security. The baseline omits reversible-oracle cost, circuit width/depth, quantum-memory restrictions, and stronger quantum ISD algorithms. A future random-code candidate needs a finite best-known quantum attack/resource analysis before any post-quantum security discussion.
+The older `(1064,532,w=117)` regression point reaches about `128.612` modeled classical attack bits under the pinned estimator, but its transparent Groverized-Prange search exponent is only about `63.679` iteration bits. It is therefore rejected as a post-quantum parameter candidate.
+
+A later focused rate-1/2 sweep held the witness weight fixed at `w=230` and located an adjacent implemented-screen boundary:
+
+```text
+(1692,846,w=230)
+  BJMMplus classical bits       127.865290976502
+  Groverized-Prange iter. bits  128.043027439769
+  KEM failure bound             9.35699517868e-10
+  result                        REJECT
+
+(1694,847,w=230)
+  BJMMplus classical bits       128.408410067763
+  Groverized-Prange iter. bits  128.025066962080
+  KEM failure bound             8.82707240635e-10
+  result                        PASS (implemented screen only)
+```
+
+Thus `(1694,847,w=230)` is only the smallest measured passing point in that focused fixed-weight, even-`n` bracket. It is **not** a post-quantum security level, a global parameter optimum, or a deployment recommendation.
+
+The quantum iteration numbers are not quantum gate-security claims. The baseline omits reversible-oracle cost, circuit width/depth, quantum-memory restrictions, constants, and stronger quantum ISD algorithms. Kachigar--Tillich and subsequent work improve on simple Groverized Prange. Any future promotion of a random-code point requires a finite best-known quantum attack/resource analysis and independent cryptanalysis.
 
 See `docs/PARAMETER_AUDIT.md` for the exact models and regression values.
 
@@ -40,7 +61,7 @@ The repository does not claim standalone LNAT or the random-code research line h
 
 - `n` bits of classical security;
 - `n/2` bits of quantum security;
-- a 128-bit post-quantum security level merely because a classical estimator crosses 128;
+- a 128-bit post-quantum security level merely because the implemented classical and Groverized-search screens both cross 128;
 - NIST security levels;
 - IND-CPA or IND-CCA security;
 - a reduction to LPN, LWE, syndrome decoding, MQ, or another accepted problem for standalone LNAT;
