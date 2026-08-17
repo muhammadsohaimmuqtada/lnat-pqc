@@ -35,7 +35,6 @@ def main() -> int:
     parser.add_argument("--max-repetitions", type=int, default=512)
     args = parser.parse_args()
 
-    any_failed = False
     for n, k, weight in args.point:
         assessment = assess_post_quantum_candidate(
             n,
@@ -53,7 +52,6 @@ def main() -> int:
             quantum_iteration_floor_bits=args.quantum_floor_bits,
             kem_failure_ceiling=args.kem_failure_ceiling,
         )
-        any_failed |= not passed
 
         print(f"point={n}:{k}:{weight}")
         print(f"classical-upstream-package={classical.upstream_package_version}")
@@ -74,7 +72,10 @@ def main() -> int:
         print(f"classical-floor-bits={args.classical_floor_bits:.12f}")
         print(f"quantum-floor-bits={args.quantum_floor_bits:.12f}")
         print(f"combined-screen-pass={passed}")
-        print("interpretation=research screen only; quantum component is a rejection baseline, not best-known quantum security")
+        print(
+            "interpretation=research screen only; quantum component is a rejection "
+            "baseline, not best-known quantum security"
+        )
         print()
 
     # Measurement mode deliberately succeeds even when candidates are rejected.
