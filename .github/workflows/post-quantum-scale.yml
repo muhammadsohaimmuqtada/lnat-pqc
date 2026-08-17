@@ -1,0 +1,31 @@
+name: post-quantum-scale-measurements
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  combined-frontier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        point:
+          - "1400:700:225"
+          - "1600:800:229"
+          - "1800:900:232"
+          - "2000:1000:234"
+          - "2100:1050:235"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned classical estimator
+        run: python -m pip install -e ".[estimator]"
+      - name: Measure combined classical/quantum/correctness screen
+        run: python experiments/post_quantum_scale_probe.py --point "${{ matrix.point }}" --classical-floor-bits 128 --quantum-floor-bits 128 --max-repetitions 512
