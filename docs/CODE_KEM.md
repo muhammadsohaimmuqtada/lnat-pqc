@@ -4,7 +4,7 @@
 
 `LNAT-CODE-KEM-0` is a **functional research KEM harness**, not a secure or standardized KEM.
 
-It exists to complete the KeyGen/Encap/Decap mechanics around `LNAT-CODE-BRIDGE-0` so that correctness, ciphertext cost, failure behavior, attacks, and future transforms can be measured end-to-end.
+It exists to complete the KeyGen/Encap/Decap mechanics around `LNAT-CODE-BRIDGE-0` so correctness, ciphertext cost, failure behavior, attacks, and future transforms can be measured end-to-end.
 
 The security boundary remains the public random-code decoding problem. LNAT derives the receiver's sparse decoding witness; it does not currently supply an independent public-key hardness assumption.
 
@@ -21,7 +21,7 @@ The repository's operational PQC path remains `LNAT-MLKEM768-HYBRID-v1`.
 ## Encapsulation
 
 1. Sample a random seed `r`.
-2. Encrypt every bit of `r` with the public random-code encryption mechanism.
+2. Encrypt every bit of `r` with the public random-code mechanism.
 3. Hash the public-key context.
 4. Compute a confirmation tag over `r`, the public context, and the complete ciphertext body.
 5. Derive the 32-byte session key with SHAKE256 from `r`, public context, ciphertext body, and confirmation tag.
@@ -42,23 +42,52 @@ The confirmation tag catches ordinary decoding failures, wrong secret keys, and 
 
 It is **not** a Fujisaki-Okamoto transform and there is no IND-CCA proof for this construction. Rejection behavior may itself be security-relevant. The module must not be described as CCA-secure.
 
-## Efficiency
+## Full-KEM correctness
 
-The reference construction encrypts the random seed bit-by-bit and is intentionally inefficient. Ciphertext size is approximately:
+Correctness is screened at the complete encapsulated-seed level, not merely per encrypted bit. The parameter audit reports both a modeled independent-bit seed-failure probability and a conservative union bound over all encapsulated bits.
+
+## Efficiency and channel-capacity gap
+
+The current reference construction encrypts every seed bit by repeating the binary hypothesis experiment many times. Its ciphertext size is approximately
 
 ```text
-encapsulated_seed_bits * repetitions * ceil(n / 8) + tag_bytes
+encapsulated_seed_bits * repetitions * ceil(n / 8) + tag_bytes.
 ```
 
-before any future compression or structural optimization.
+For each public-code word, the receiver observes a binary asymmetric channel:
 
-This makes ciphertext growth visible instead of hiding it behind an unrealistic size claim.
+```text
+P(Z=1 | encoded bit 0) = q
+P(Z=1 | encoded bit 1) = 1/2
+```
+
+where `q` is the odd support-intersection probability. `src/code_channel_audit.py` computes the Shannon capacity of this channel and compares the repetition construction with a capacity-only lower bound.
+
+For the current necessary-screening regression point `(n=256,k=128,w=30,error_weight=1,repetitions=233)` carrying a 128-bit seed:
+
+```text
+channel capacity              ~= 0.131486 bits/use
+repetition channel uses        = 29,824
+capacity-only lower-bound uses = 974
+repetition ciphertext          = 954,384 bytes
+capacity-only byte floor       = 31,184 bytes
+repetition overhead            ~= 30.6x
+```
+
+The ~31 KB figure is **not an achievable ciphertext claim**. It ignores finite-blocklength reliability overhead and coding structure. It only proves that independent per-bit repetition leaves a large efficiency gap worth researching.
+
+Tool:
+
+```bash
+python experiments/code_channel_audit.py
+```
 
 ## Required research before any serious candidate
 
 - replace toy bridge parameters with profiles that survive concrete modern ISD estimates;
-- measure full encapsulation/decapsulation failure probability, not just individual bit failure;
-- investigate multi-bit/codeword encryption instead of bit-by-bit repetition;
+- retain full-KEM rather than per-bit failure analysis;
+- replace independent bit repetition with a justified multi-bit/channel-coding construction;
+- measure finite-blocklength correctness and ciphertext size of that construction;
 - analyze confirmation/rejection behavior;
 - define a formal PKE/KEM security game;
 - obtain independent cryptanalysis;
