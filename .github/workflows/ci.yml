@@ -52,8 +52,10 @@ jobs:
         run: python attacks/bridge_sparse_witness_recovery.py
       - name: Code profile correctness and search audit
         run: python experiments/code_profile_audit.py --trivial-floor-bits 16
-      - name: Attack-aware full-KEM parameter frontier regression
+      - name: Historical local Stern frontier regression
         run: python experiments/code_parameter_frontier.py --n 256 --k 128 --prange-trial-bits 32 --stern-op-bits 64 --error-weight 1 --encapsulated-bits 128 --kem-failure-ceiling 1e-9 --max-repetitions 450
+      - name: Measured modern candidate footprint
+        run: python experiments/candidate_footprint.py
       - name: Code KEM channel efficiency audit
         run: python experiments/code_channel_audit.py --n 256 --k 128 --secret-weight 30 --error-weight 1 --repetitions 233 --cutoff 66 --message-bits 128 --tag-bytes 16
       - name: Multi-bit outer-code packing probe
