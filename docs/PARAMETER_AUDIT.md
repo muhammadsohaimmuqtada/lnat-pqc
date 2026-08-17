@@ -2,129 +2,98 @@
 
 This repository does not assign a security level to the random-code comparator, `LNAT-CODE-BRIDGE-0`, or the research LNAT code KEMs.
 
-Before a code-based research profile is even worth deeper cryptanalysis, necessary attack and correctness checks must be reported separately.
+Parameter work is attack-first. Candidate sizes must be evaluated against the cheapest public attack model currently wired into the repository and against the conservative full-KEM correctness bound.
 
-## 1. Full sparse-witness enumeration ceiling
+## Direct sparse-witness ceiling
 
-For an exact-weight hidden witness of length `n` and weight `w`, there are `C(n,w)` possible supports. Therefore `log2(C(n,w))` is only a ceiling against basic full-support enumeration.
-
-A 256-bit LNAT master seed cannot provide 256 bits of security if it deterministically maps into a much smaller public hidden-witness space.
-
-## 2. Prange information-set baseline
-
-For a binary `[n,k]` code and weight-`w` error, the basic Prange combinatorial model has expected information-set count
+For an exact-weight hidden witness of length `n` and weight `w`, direct support enumeration costs at most
 
 ```text
-C(n,w) / C(n-k,w)
+log2(C(n,w))
 ```
 
-when `w <= n-k`.
+in the combinatorial search model. A large LNAT master seed cannot increase security beyond a smaller public witness space.
 
-The repository reports `log2(expected information-set trials)` separately from full witness-space size. This is not a total operation count.
+## Executable reduced attack baselines
 
-## 3. Stern collision/list baseline
+The repository keeps executable reduced attacks for Prange, Lee-Brickell, and Stern syndrome decoding. They validate attack mechanisms by recovering valid public witnesses on small instances.
 
-The active frontier now also evaluates each candidate with the executable Stern-style collision model in `src/code_stern.py`.
+Their local cost models are useful for comparative research, but they are not the serious parameter-security estimator. In particular, the historical local Stern screen admitted `(256,128,w=48)` near a nominal 64 reference-operation-bit floor, while the maintained modern estimator measures that same point near only 21.46 modeled attack bits.
 
-That model explicitly accounts for:
+## Maintained modern syndrome-decoding screen
 
-- the useful information-set probability for `(p,l)`;
-- left/right list sizes;
-- expected projection collisions;
-- a naive GF(2) elimination term;
-- list/collision processing work; and
-- list memory.
+`src/code_sd_estimator.py` pins `cryptographic-estimators==2.1.1` and exposes finite modern syndrome-decoding estimates. `src/code_modern_frontier.py` defines the serious effective public attack screen as
 
-The resulting `stern-modeled-operation-bits` are **reference-model operation bits**, not a proven security level. They are deliberately kept separate from Prange trial bits because the units differ.
+```text
+effective_attack_bits = min(
+    maintained_upstream_ISD_time_bits,
+    log2(C(n,w)) direct support enumeration,
+)
+```
 
-## 4. Exact per-bit correctness model
+Estimator values are model results, not security proofs. Crossing a requested numeric floor means only that the candidate survives the public attack models currently evaluated by this repository.
 
-For the Alekhnovich-style comparator, an encryption of zero contains a dual-code word plus a fresh fixed-weight error. The dual-code component is orthogonal to the receiver's sparse witness, so the remaining inner-product error is controlled by the parity of the intersection of two fixed-weight supports.
+## Exact correctness and full-KEM failure
 
-The repository computes that probability exactly, then computes bit-0 and bit-1 failure probabilities with binomial tails.
+The per-bit zero error probability is derived exactly from the parity of the intersection of two fixed-weight supports. Bit-0 and bit-1 decision failures are computed with binomial tails.
 
-## 5. Full-KEM correctness composition
-
-A small per-bit failure probability is not the KEM failure probability.
-
-For a uniformly random encapsulated bit,
+For a uniformly random `m`-bit encapsulated seed, the reference model reports
 
 ```text
 p_avg = (p0 + p1) / 2
+modeled seed failure = 1 - (1 - p_avg)^m
 ```
 
-and under the reference model's independent fresh encryption randomness, an `m`-bit seed has modeled failure probability
+and uses the more conservative bound
 
 ```text
-1 - (1 - p_avg)^m.
+min(1, m * max(p0,p1))
 ```
 
-The audit also reports the conservative union bound
+as the active correctness gate.
+
+## Current measured 128-bit research screen
+
+The pinned modern estimator and direct support-enumeration ceiling give the following focused boundary at rate 1/2:
 
 ```text
-m * max(p0, p1)
+(1056,528,w=116) -> ~127.669 effective bits in the earlier sweep: below 128
+(1064,532,w=116) -> 127.612109 effective bits: below 128
+(1064,532,w=117) -> 128.611921 effective bits: above 128
+(1072,536,w=117) -> ~128.615 effective bits: above 128
 ```
 
-clamped to 1. The active frontier uses this conservative bound as its correctness gate.
-
-## 6. Attack-aware parameter frontier
-
-`experiments/code_parameter_frontier.py` now requires all of these simultaneously:
-
-1. a requested Prange expected-trial floor;
-2. a requested Stern reference-operation floor;
-3. an encapsulated-seed length; and
-4. a requested conservative full-KEM failure ceiling.
-
-Example:
-
-```bash
-python experiments/code_parameter_frontier.py \
-  --n 256 --k 128 \
-  --prange-trial-bits 32 \
-  --stern-op-bits 64 \
-  --error-weight 1 \
-  --encapsulated-bits 128 \
-  --kem-failure-ceiling 1e-9 \
-  --max-repetitions 450
-```
-
-The deterministic research regression is now:
+For `(1064,532,w=117)` with encryption-error weight 1, a 128-bit encapsulated seed and conservative full-KEM failure ceiling `1e-9`, the current correctness model requires:
 
 ```text
-n = 256
-k = 128
-secret weight = 48
-Prange expected trial bits >= 32
-Stern reference-operation bits >= 64
-Stern best modeled p = 3
-Stern best modeled l = 12
-encapsulated seed = 128 bits
-repetitions = 394
-cutoff ones = 131
-conservative full-KEM failure bound <= 1e-9
+repetitions = 220
+cutoff ones = 61
+conservative KEM failure bound = 8.44167402647e-10
 ```
 
-The previous `w=30`, 233-repetition point remains useful as a historical Prange/full-KEM correctness regression, but it does not pass the new 64-bit Stern reference-operation floor. This does **not** mean the new `w=48` point has 64 bits of cryptographic security. It only survives the attack models currently implemented in this repository.
+Direct support enumeration at this point is about `527.112` bits, so the pinned May-Ozerov estimate is the active modeled bottleneck.
+
+`(1064,532,w=117)` is therefore the smallest **measured passing point in the current focused bracket**. It is not a standardized parameter set, not a 128-bit security claim, and not deployment-ready.
 
 ## Tooling
 
 ```bash
-python experiments/code_profile_audit.py
-python experiments/code_parameter_frontier.py
-python experiments/code_parameter_frontier.py --grid
-python experiments/lee_brickell_probe.py
-python experiments/stern_probe.py
+python -m pip install -e ".[estimator]"
+python experiments/upstream_isd_probe.py --n 256 --k 128 --weight 48
+python experiments/modern_isd_scale_probe.py --point 1064:532:116 --point 1064:532:117
+python experiments/modern_frontier_probe.py --n 1064 --k 532 --weight 117 --attack-floor-bits 128
 ```
 
 ## Rule for future profiles
 
 No future bridge/KEM profile should be presented as a serious candidate until it has, at minimum:
 
-1. an explicit full witness-space audit;
-2. executable Prange, Lee-Brickell, and Stern-style reduced attacks;
-3. separate attack-cost metrics with explicit time/memory models;
-4. an exact or conservative full-KEM correctness/failure analysis;
-5. stronger Dumer/BJMM-style analysis before any security-level claim;
+1. direct sparse-support enumeration audit;
+2. executable reduced syndrome-decoding attacks;
+3. pinned maintained modern syndrome-decoding cross-check;
+4. `min(modern ISD, support enumeration)` effective attack accounting;
+5. conservative full-KEM correctness/failure analysis;
 6. independent cryptanalysis; and
 7. a clearly stated security assumption or reduction target.
+
+Even satisfying all seven is a research milestone, not a security proof or deployment recommendation.
