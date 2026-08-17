@@ -26,10 +26,11 @@ EXP1 published `LSB(q_t)`, a fixed state coordinate. EXP2 uses a keyed, step-sep
 The repository maintains separate screens for different evidence classes:
 
 - a **classical** finite-parameter screen using pinned `cryptographic-estimators==2.1.1` plus direct support enumeration;
-- a **quantum-search rejection baseline** that applies Grover/amplitude-amplification to Prange search and direct support enumeration; and
+- a **quantum-search rejection baseline** that applies Grover/amplitude-amplification to Prange search and direct support enumeration;
+- a **paper-grounded quantum Prange resource surface** that exposes logical-qubit counts and the published asymptotic depth scale; and
 - the conservative full-KEM correctness/failure bound.
 
-`src/code_post_quantum_frontier.py` requires these gates simultaneously while keeping their units separate.
+`src/code_post_quantum_frontier.py` requires the classical, quantum-search, and correctness gates simultaneously while keeping their units separate. `src/code_quantum_prange_resources.py` then exposes the physical-resource assumptions behind the currently implemented quantum Prange path.
 
 The older `(1064,532,w=117)` regression point reaches about `128.612` modeled classical attack bits under the pinned estimator, but its transparent Groverized-Prange search exponent is only about `63.679` iteration bits. It is therefore rejected as a post-quantum parameter candidate.
 
@@ -51,9 +52,25 @@ A later focused rate-1/2 sweep held the witness weight fixed at `w=230` and loca
 
 Thus `(1694,847,w=230)` is only the smallest measured passing point in that focused fixed-weight, even-`n` bracket. It is **not** a post-quantum security level, a global parameter optimum, or a deployment recommendation.
 
-The quantum iteration numbers are not quantum gate-security claims. The baseline omits reversible-oracle cost, circuit width/depth, quantum-memory restrictions, constants, and stronger quantum ISD algorithms. Kachigar--Tillich and subsequent work improve on simple Groverized Prange. Any future promotion of a random-code point requires a finite best-known quantum attack/resource analysis and independent cryptanalysis.
+## Concrete Prange resource surface
 
-See `docs/PARAMETER_AUDIT.md` for the exact models and regression values.
+The repository now instantiates the circuit-resource formulas from Esser et al., *An Optimized Quantum Implementation of ISD on Scalable Quantum Resources* (ePrint 2021/1608 / arXiv:2112.06157), with provenance pinned to the authors' supplementary `qiboteam/qISD` implementation at commit `456b3c60987e426a18d4ed4e5ebeaee3d2570958`.
+
+For `(1694,847,w=230)` the model reports:
+
+```text
+Prange expected-trial bits                256.050133924
+idealized Grover iteration bits            127.676563092
+width-optimized logical qubits             721,643
+depth-oriented full logical qubits         1,438,205
+Table-2 width-optimized depth-scale bits   163.626791037
+```
+
+The qubit counts are closed-form logical-qubit counts from the paper. The depth-scale value keeps Table 2's `n^3 log(n)/sqrt(q)` expression literal and is **not** an exact gate depth: Table 2 states it using big-O notation, so multiplicative constants and concrete gate decomposition costs are hidden. The separate `pi/4` amplitude-amplification constant is used only in the idealized iteration estimate, not injected into the big-O depth scale. The qISD supplementary simulator is intended for small circuits and is not treated as a way to simulate a 700k-qubit attack.
+
+These resource figures strengthen the accounting around the current Prange attack, but they do not rescue the parameter point or establish a PQ security level. Stronger quantum ISD algorithms remain outside the finite model.
+
+See `docs/PARAMETER_AUDIT.md` for the attack/correctness boundary and `docs/QUANTUM_RESOURCES.md` for the circuit-resource units and provenance.
 
 ## Claims deliberately not made
 
@@ -62,6 +79,7 @@ The repository does not claim standalone LNAT or the random-code research line h
 - `n` bits of classical security;
 - `n/2` bits of quantum security;
 - a 128-bit post-quantum security level merely because the implemented classical and Groverized-search screens both cross 128;
+- an exact quantum gate-security level derived from a big-O circuit-depth expression;
 - NIST security levels;
 - IND-CPA or IND-CCA security;
 - a reduction to LPN, LWE, syndrome decoding, MQ, or another accepted problem for standalone LNAT;
@@ -81,7 +99,7 @@ A future standalone LNAT KEM needs at minimum:
 8. malformed-ciphertext/chosen-ciphertext analysis;
 9. independent cryptanalysis.
 
-For any random-code comparator promoted beyond a toy experiment, the quantum analysis must include stronger information-set-decoding attacks rather than stopping at Groverized Prange.
+For any random-code comparator promoted beyond a toy experiment, the quantum analysis must include stronger information-set-decoding attacks rather than stopping at Groverized Prange, and any concrete-resource claim must distinguish logical qubits, oracle iterations, gate depth, qRAM assumptions, and fault-tolerant overhead.
 
 ## Side channels
 
