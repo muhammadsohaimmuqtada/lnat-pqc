@@ -56,6 +56,8 @@ jobs:
         run: python experiments/code_parameter_frontier.py --n 256 --k 128 --prange-trial-bits 32 --error-weight 1 --failure-ceiling 1e-9 --max-repetitions 256
       - name: Full LNAT code KEM research round-trip
         run: python experiments/lnat_code_kem_probe.py --trials 4
+      - name: Public break of toy LNAT code KEM
+        run: python attacks/code_kem_public_decapsulation.py
       - name: Operational hybrid smoke test
         run: python src/lnat_hybrid_kem.py
       - name: Compile
