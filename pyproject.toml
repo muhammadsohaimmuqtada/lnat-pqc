@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lnat-pqc-research"
-version = "0.4.6a0"
+version = "0.4.7a0"
 description = "LNAT experimental primitive, cryptanalysis harness, and ML-KEM hybrid research profile"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,7 +13,8 @@ dependencies = []
 
 [project.optional-dependencies]
 pqc = ["cryptography>=47.0.0,<50"]
-dev = ["cryptography>=47.0.0,<50"]
+estimator = ["cryptographic-estimators==2.1.1"]
+dev = ["cryptography>=47.0.0,<50", "cryptographic-estimators==2.1.1"]
 
 [project.scripts]
 lnat-pqc = "lnat_cli:main"
@@ -37,5 +38,6 @@ py-modules = [
   "code_kem_attacks",
   "code_isd",
   "code_stern",
+  "code_sd_estimator",
 ]
 package-dir = { "" = "src" }
