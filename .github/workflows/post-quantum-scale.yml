@@ -1,0 +1,30 @@
+name: post-quantum-scale-measurements
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  combined-frontier-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - point: "1692:846:230"
+            expectation: "reject"
+          - point: "1694:847:230"
+            expectation: "pass"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned classical estimator
+        run: python -m pip install -e ".[estimator]"
+      - name: Enforce combined classical/quantum/correctness boundary
+        run: python experiments/post_quantum_scale_probe.py --point "${{ matrix.point }}" --classical-floor-bits 128 --quantum-floor-bits 128 --max-repetitions 512 --expect "${{ matrix.expectation }}"

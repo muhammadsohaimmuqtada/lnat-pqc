@@ -33,17 +33,17 @@ effective_classical_attack_bits = min(
 
 Estimator values are model results, not security proofs. Crossing a requested numeric floor means only that the candidate survives the classical public attack models currently evaluated by this repository.
 
-## Quantum ISD baseline
+## Quantum ISD rejection baseline
 
 The maintained estimator above is classical. A post-quantum project must not treat a classical 128-bit crossing as a 128-bit post-quantum result.
 
-`src/code_quantum_isd.py` therefore adds a deliberately transparent finite baseline based on Grover/amplitude-amplification of Prange information-set search and of direct support enumeration. If a classical search count has exponent `b = log2(N)`, idealized Grover search uses `Theta(sqrt(N))` oracle iterations, so the query/iteration exponent is
+`src/code_quantum_isd.py` therefore adds a deliberately transparent finite rejection baseline based on Grover/amplitude-amplification of Prange information-set search and direct support enumeration. If a classical search count has exponent `b = log2(N)`, idealized Grover search uses `Theta(sqrt(N))` oracle iterations, so the query/iteration exponent is
 
 ```text
 grover_iteration_bits = b / 2
 ```
 
-The active quantum baseline is
+The active quantum rejection baseline is
 
 ```text
 effective_quantum_search_bits = min(
@@ -52,7 +52,9 @@ effective_quantum_search_bits = min(
 )
 ```
 
-These are **quantum search iteration exponents**, not gate counts. They omit the reversible linear-algebra oracle cost, quantum memory/circuit constraints, and constants. They are also not best-known-quantum-ISD estimates: Kachigar--Tillich (PQCrypto 2017, arXiv:1703.00263) and later work give quantum-walk improvements over simple Groverized Prange. Passing this baseline is therefore necessary but not sufficient.
+These are **quantum search iteration exponents**, not gate counts. They omit reversible linear-algebra oracle cost, quantum memory/circuit constraints, and constants. They are also not best-known-quantum-ISD estimates: Kachigar--Tillich (PQCrypto 2017, arXiv:1703.00263) and later work give quantum-walk improvements over simple Groverized Prange. Failing this baseline is enough to reject a point; passing it is not enough to establish post-quantum security.
+
+`src/code_post_quantum_frontier.py` keeps the classical and quantum units separate and requires the classical floor, quantum iteration floor, and correctness ceiling simultaneously. It deliberately does not take a numeric minimum across unlike cost models.
 
 ## Exact correctness and full-KEM failure
 
@@ -73,45 +75,64 @@ min(1, m * max(p0,p1))
 
 as the active correctness gate.
 
-## Classical 128-bit boundary and quantum rejection
+## Classical-only boundary and quantum rejection
 
-The pinned modern classical estimator and direct support-enumeration ceiling give the following focused classical boundary at rate 1/2:
+The earlier focused classical boundary at rate 1/2 was:
 
 ```text
-(1056,528,w=116) -> ~127.669 effective classical bits: below 128
 (1064,532,w=116) -> 127.612109 effective classical bits: below 128
 (1064,532,w=117) -> 128.611921 effective classical bits: above 128
-(1072,536,w=117) -> ~128.615 effective classical bits: above 128
 ```
 
-For `(1064,532,w=117)` with encryption-error weight 1, a 128-bit encapsulated seed and conservative full-KEM failure ceiling `1e-9`, the current correctness model requires:
+But `(1064,532,w=117)` has only `63.679389716161` Groverized-Prange iteration bits, so it is retained only as a classical-screen regression and is rejected by the quantum baseline.
+
+## Combined implemented-baseline boundary
+
+A rate-1/2 sweep then required all three currently implemented gates simultaneously:
 
 ```text
-repetitions = 220
-cutoff ones = 61
-conservative KEM failure bound = 8.44167402647e-10
+classical effective attack bits >= 128
+Groverized quantum-search iteration bits >= 128
+conservative full-KEM failure bound <= 1e-9
 ```
 
-However, the same `(1064,532,w=117)` geometry has
+The final focused sweep held the witness weight fixed at `w=230` to avoid a weight-jump confounder. The adjacent even-`n` boundary is:
 
 ```text
-Prange expected trial bits = 127.358779432322
-Groverized Prange iteration bits = 63.679389716161
-Groverized support-enumeration bits = 263.555987650400
+(1692,846,w=230)
+  fastest classical attack       = BJMMplus
+  classical effective bits       = 127.865290976502
+  Groverized-Prange iter. bits   = 128.043027439769
+  support enumeration bits       = 965.201348624157
+  repetitions                    = 266
+  cutoff ones                    = 79
+  conservative KEM failure       = 9.35699517868e-10
+  combined implemented screen    = REJECT
+
+(1694,847,w=230)
+  fastest classical attack       = BJMMplus
+  classical effective bits       = 128.408410067763
+  Groverized-Prange iter. bits   = 128.025066962080
+  support enumeration bits       = 965.622519148962
+  repetitions                    = 266
+  cutoff ones                    = 79
+  conservative KEM failure       = 8.82707240635e-10
+  combined implemented screen    = PASS
 ```
 
-so the transparent quantum-search bottleneck is Groverized Prange at about `63.68` iteration bits. Consequently `(1064,532,w=117)` remains a useful **classical-screen regression point**, but it is rejected as a post-quantum frontier candidate.
+Thus `(1694,847,w=230)` is the smallest measured passing point in this **focused rate-1/2, fixed-`w=230`, even-`n` bracket**. That statement is deliberately narrow. It is not a global parameter optimum and it is not a 128-bit post-quantum security claim.
 
-This does not mean the construction has exactly 63.68 bits of quantum gate security. The repository has not yet implemented a concrete reversible circuit/resource estimate or a finite best-known quantum-ISD estimator. It means the previous classical-only 128-bit screen was not adequate evidence for a PQC claim.
+The quantum component is only a rejection baseline. Kachigar--Tillich and subsequent quantum-ISD work improve on Groverized Prange, and this repository still lacks a finite best-known quantum-ISD resource estimator, reversible-oracle cost, circuit width/depth accounting, and independent cryptanalysis. Therefore the random-code line remains research-only even at `(1694,847,w=230)`.
 
 ## Tooling
 
 ```bash
 python -m pip install -e ".[estimator]"
 python experiments/upstream_isd_probe.py --n 256 --k 128 --weight 48
-python experiments/modern_isd_scale_probe.py --point 1064:532:116 --point 1064:532:117
 python experiments/modern_frontier_probe.py --n 1064 --k 532 --weight 117 --attack-floor-bits 128
 python experiments/quantum_isd_probe.py --n 1064 --k 532 --weight 117 --iteration-floor-bits 128 --expect reject
+python experiments/post_quantum_scale_probe.py --point 1692:846:230 --classical-floor-bits 128 --quantum-floor-bits 128 --expect reject
+python experiments/post_quantum_scale_probe.py --point 1694:847:230 --classical-floor-bits 128 --quantum-floor-bits 128 --expect pass
 ```
 
 ## Rule for future profiles

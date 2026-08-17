@@ -13,7 +13,9 @@ LNAT studies secret-seeded noisy state-transition processes as a cryptographic r
 
 > **Security boundary:** standalone LNAT has no established security level. The operational hybrid uses ML-KEM-768 for public-key encapsulation and keeps the ML-KEM shared secret as a direct input to the final SHAKE256 extraction. LNAT is additional deterministic post-processing, not an independently proven source of post-quantum security.
 
-The random-code `LNAT-CODE-*` experiments are also not a substitute for that boundary. Their current `(1064,532,w=117)` point crosses the repository's pinned **classical** modern-ISD screen, but a transparent Groverized-Prange baseline reduces the search-iteration exponent to about `63.68`. The point is therefore retained only as a classical-screen regression, not as a post-quantum parameter recommendation. Stronger quantum ISD is still an open cryptanalytic requirement.
+The random-code `LNAT-CODE-*` experiments are also not a substitute for that boundary. The older `(1064,532,w=117)` point crosses the repository's pinned **classical** modern-ISD screen but is rejected by the Groverized-Prange quantum-search baseline at about `63.68` iteration bits.
+
+The current combined research screen requires a 128-bit classical estimator floor, a separate 128-bit Groverized-search iteration floor, and the full-KEM correctness bound simultaneously. In the focused rate-1/2 fixed-`w=230` sweep, `(1692,846,w=230)` rejects while `(1694,847,w=230)` passes the **implemented** screen. This is a measurement boundary, not a post-quantum security claim: stronger quantum ISD remains an open cryptanalytic requirement.
 
 ## LNAT-EXP2
 
@@ -105,10 +107,14 @@ python attacks/markov_predictor.py --train 64 --test 32 -k 4
 python experiments/quantum_isd_probe.py \
   --n 1064 --k 532 --weight 117 \
   --iteration-floor-bits 128 --expect reject
+python experiments/post_quantum_scale_probe.py \
+  --point 1692:846:230 --classical-floor-bits 128 --quantum-floor-bits 128 --expect reject
+python experiments/post_quantum_scale_probe.py \
+  --point 1694:847:230 --classical-floor-bits 128 --quantum-floor-bits 128 --expect pass
 python benchmarks/bench.py --rounds 10 --hybrid
 ```
 
-CI runs Python 3.11, 3.12, and 3.13, installs the real ML-KEM backend, runs unit/integration tests, reproduces the archived KEM-v1 break, runs code-decoding attack regressions, cross-checks the pinned classical syndrome-decoding estimator, and requires the classical-only `(1064,532,w=117)` frontier to be rejected by the quantum-search baseline.
+CI runs Python 3.11, 3.12, and 3.13, installs the real ML-KEM backend, runs unit/integration tests, reproduces the archived KEM-v1 break, runs code-decoding attack regressions, cross-checks the pinned classical syndrome-decoding estimator, rejects the classical-only `(1064,532,w=117)` point under the quantum-search baseline, and reproduces the focused `1692` reject / `1694` pass combined-screen boundary.
 
 ## Attack-first research
 
@@ -122,6 +128,7 @@ Current tooling includes:
 - executable Prange, Lee-Brickell, and Stern code-decoding baselines;
 - pinned modern classical syndrome-decoding estimates;
 - transparent Groverized-Prange/support-enumeration quantum-search screening;
+- unified classical + quantum-baseline + correctness parameter screening;
 - machine-readable parameter sweeps;
 - deterministic known-answer vectors.
 
@@ -139,6 +146,7 @@ lnat-pqc/
 │   ├── code_sd_estimator.py
 │   ├── code_modern_frontier.py
 │   ├── code_quantum_isd.py
+│   ├── code_post_quantum_frontier.py
 │   ├── lnat_cli.py
 │   └── lnat_kem.py
 ├── attacks/
@@ -149,7 +157,8 @@ lnat-pqc/
 ├── experiments/
 │   ├── parameter_sweep.py
 │   ├── modern_frontier_probe.py
-│   └── quantum_isd_probe.py
+│   ├── quantum_isd_probe.py
+│   └── post_quantum_scale_probe.py
 ├── benchmarks/bench.py
 ├── tests/
 └── docs/
@@ -172,6 +181,7 @@ Completed:
 - [x] executable code-decoding attack baselines
 - [x] pinned modern classical ISD screening
 - [x] classical-only frontier rejected under a quantum-search baseline
+- [x] combined implemented-baseline boundary measured and regression-gated
 - [x] Python 3.11–3.13 CI
 
 Open standalone-LNAT/code research:
