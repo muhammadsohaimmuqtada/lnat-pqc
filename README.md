@@ -2,15 +2,18 @@
 
 **Learning Noisy Automata Transitions — experimental primitive, cryptanalysis harness, and operational ML-KEM integration**
 
-LNAT studies secret-seeded noisy state-transition processes as a cryptographic research object. The repository separates three things that must not be confused:
+LNAT studies secret-seeded noisy state-transition processes as a cryptographic research object. The repository separates components that must not be confused:
 
 | Component | Status | Purpose |
 |---|---|---|
 | `LNAT-EXP2` | experimental | standalone noisy-automaton primitive for analysis |
 | archived `LNAT KEM-v1` | **broken** | reproducible negative result |
+| `LNAT-CODE-*` | research comparator; **not a PQ-secure candidate** | explores a random-code asymmetric boundary and attack methodology |
 | `LNAT-MLKEM768-HYBRID-v1` | operational research profile | complete PQC-backed KeyGen/Encap/Decap integration |
 
 > **Security boundary:** standalone LNAT has no established security level. The operational hybrid uses ML-KEM-768 for public-key encapsulation and keeps the ML-KEM shared secret as a direct input to the final SHAKE256 extraction. LNAT is additional deterministic post-processing, not an independently proven source of post-quantum security.
+
+The random-code `LNAT-CODE-*` experiments are also not a substitute for that boundary. Their current `(1064,532,w=117)` point crosses the repository's pinned **classical** modern-ISD screen, but a transparent Groverized-Prange baseline reduces the search-iteration exponent to about `63.68`. The point is therefore retained only as a classical-screen regression, not as a post-quantum parameter recommendation. Stronger quantum ISD is still an open cryptanalytic requirement.
 
 ## LNAT-EXP2
 
@@ -62,6 +65,12 @@ lnat-pqc selftest
 
 The ML-KEM Python backend requires `cryptography>=47`.
 
+Modern classical syndrome-decoding estimator:
+
+```bash
+python -m pip install -e ".[estimator]"
+```
+
 ### End-to-end CLI
 
 ```bash
@@ -93,10 +102,13 @@ python attacks/public_recovery_v1.py
 python attacks/exhaustive_seed_recovery.py --seed-bits 8 --traces 3 --noise 0.05
 python attacks/statistical_probe.py --samples 32
 python attacks/markov_predictor.py --train 64 --test 32 -k 4
+python experiments/quantum_isd_probe.py \
+  --n 1064 --k 532 --weight 117 \
+  --iteration-floor-bits 128 --expect reject
 python benchmarks/bench.py --rounds 10 --hybrid
 ```
 
-CI runs Python 3.11, 3.12, and 3.13, installs the real ML-KEM backend, runs unit/integration tests, runs the CLI self-test, reproduces the archived KEM-v1 break, performs toy seed recovery, runs a statistical smoke probe, and exercises the operational hybrid.
+CI runs Python 3.11, 3.12, and 3.13, installs the real ML-KEM backend, runs unit/integration tests, reproduces the archived KEM-v1 break, runs code-decoding attack regressions, cross-checks the pinned classical syndrome-decoding estimator, and requires the classical-only `(1064,532,w=117)` frontier to be rejected by the quantum-search baseline.
 
 ## Attack-first research
 
@@ -107,10 +119,13 @@ Current tooling includes:
 - multi-trace scoring under noise;
 - monobit and lag-1 trace statistics;
 - held-out Markov next-bit prediction;
+- executable Prange, Lee-Brickell, and Stern code-decoding baselines;
+- pinned modern classical syndrome-decoding estimates;
+- transparent Groverized-Prange/support-enumeration quantum-search screening;
 - machine-readable parameter sweeps;
 - deterministic known-answer vectors.
 
-See [`docs/GAMES.md`](docs/GAMES.md) and [`docs/RESEARCH_ROADMAP.md`](docs/RESEARCH_ROADMAP.md).
+See [`docs/GAMES.md`](docs/GAMES.md), [`docs/PARAMETER_AUDIT.md`](docs/PARAMETER_AUDIT.md), and [`docs/RESEARCH_ROADMAP.md`](docs/RESEARCH_ROADMAP.md).
 
 ## Repository layout
 
@@ -121,6 +136,9 @@ lnat-pqc/
 │   ├── lnat_params.py
 │   ├── lnat_analysis.py
 │   ├── lnat_hybrid_kem.py
+│   ├── code_sd_estimator.py
+│   ├── code_modern_frontier.py
+│   ├── code_quantum_isd.py
 │   ├── lnat_cli.py
 │   └── lnat_kem.py
 ├── attacks/
@@ -128,7 +146,10 @@ lnat-pqc/
 │   ├── exhaustive_seed_recovery.py
 │   ├── statistical_probe.py
 │   └── markov_predictor.py
-├── experiments/parameter_sweep.py
+├── experiments/
+│   ├── parameter_sweep.py
+│   ├── modern_frontier_probe.py
+│   └── quantum_isd_probe.py
 ├── benchmarks/bench.py
 ├── tests/
 └── docs/
@@ -148,13 +169,17 @@ Completed:
 - [x] operational ML-KEM-768 hybrid KeyGen/Encap/Decap
 - [x] versioned serialization and context binding
 - [x] operational CLI with protected key-file handling
+- [x] executable code-decoding attack baselines
+- [x] pinned modern classical ISD screening
+- [x] classical-only frontier rejected under a quantum-search baseline
 - [x] Python 3.11–3.13 CI
 
-Open standalone-LNAT research:
+Open standalone-LNAT/code research:
 
-- [ ] identify a defensible public-key trapdoor/asymmetric relation
+- [ ] identify a defensible LNAT-native public-key trapdoor/asymmetric relation
+- [ ] finite best-known quantum-ISD/resource estimate for any random-code candidate
 - [ ] stronger distinguishers and time-memory attacks
-- [ ] concrete attack-cost model for any proposed large profile
+- [ ] concrete classical and quantum attack-cost models for any proposed large profile
 - [ ] independent cryptanalysis
 - [ ] formal reduction/assumption if one can actually be established
 - [ ] constant-time implementation before any deployment discussion
