@@ -25,7 +25,7 @@ jobs:
       - name: Executable Stern collision probe
         run: python experiments/stern_probe.py
       - name: Compile ISD modules
-        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py
+        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py experiments/modern_isd_scale_probe.py
 
   upstream-modern-estimator:
     runs-on: ubuntu-latest
@@ -40,3 +40,5 @@ jobs:
         run: python -m unittest tests.test_code_sd_estimator -v
       - name: Cross-check active Stern-aware profile
         run: python experiments/upstream_isd_probe.py --n 256 --k 128 --weight 48 --top 8
+      - name: Measure scaled modern-ISD frontier candidates
+        run: python experiments/modern_isd_scale_probe.py
