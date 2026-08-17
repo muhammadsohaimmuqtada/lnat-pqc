@@ -19,10 +19,24 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: ISD unit tests
-        run: python -m unittest tests.test_code_isd tests.test_code_stern -v
+        run: python -m unittest tests.test_code_isd tests.test_code_stern tests.test_code_sd_estimator -v
       - name: Executable Lee-Brickell probe
         run: python experiments/lee_brickell_probe.py
       - name: Executable Stern collision probe
         run: python experiments/stern_probe.py
       - name: Compile ISD modules
-        run: python -m compileall -q src/code_isd.py src/code_stern.py tests/test_code_isd.py tests/test_code_stern.py experiments/lee_brickell_probe.py experiments/stern_probe.py
+        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py
+
+  upstream-modern-estimator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned estimator bridge
+        run: python -m pip install -e ".[estimator]"
+      - name: Run estimator bridge tests
+        run: python -m unittest tests.test_code_sd_estimator -v
+      - name: Cross-check screened profile with modern ISD algorithms
+        run: python experiments/upstream_isd_probe.py --n 256 --k 128 --weight 30 --top 8
