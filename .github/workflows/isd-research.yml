@@ -1,0 +1,26 @@
+name: isd-research-checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lee-brickell:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lee-Brickell unit tests
+        run: python -m unittest tests.test_code_isd -v
+      - name: Executable generalized ISD probe
+        run: python experiments/lee_brickell_probe.py
+      - name: Compile ISD modules
+        run: python -m compileall -q src/code_isd.py tests/test_code_isd.py experiments/lee_brickell_probe.py
