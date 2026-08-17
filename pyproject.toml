@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lnat-pqc-research"
-version = "0.3.5a0"
+version = "0.4.0a0"
 description = "LNAT experimental primitive, cryptanalysis harness, and ML-KEM hybrid research profile"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -30,5 +30,6 @@ py-modules = [
   "lnat_code_bridge",
   "code_attacks",
   "code_profile_audit",
+  "lnat_code_kem",
 ]
 package-dir = { "" = "src" }
