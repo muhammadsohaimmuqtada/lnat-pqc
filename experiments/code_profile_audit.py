@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report necessary correctness and trivial-search guards for code profiles."""
+"""Report necessary correctness and public-attack guards for code profiles."""
 
 from __future__ import annotations
 
@@ -25,7 +25,13 @@ def main() -> int:
         "--trivial-floor-bits",
         type=float,
         default=None,
-        help="optional necessary floor for naive witness enumeration only",
+        help="optional necessary floor for full witness enumeration only",
+    )
+    parser.add_argument(
+        "--prange-trial-floor-bits",
+        type=float,
+        default=None,
+        help="optional floor for log2 expected Prange information-set trials only",
     )
     args = parser.parse_args()
 
@@ -45,6 +51,8 @@ def main() -> int:
     print(f"encryption-error-weight={params.encryption_error_weight}")
     print(f"witness-space-size={audit.witness_space_size}")
     print(f"trivial-enumeration-bits={audit.trivial_enumeration_bits:.6f}")
+    print(f"prange-expected-information-sets={audit.prange_expected_information_sets:.6f}")
+    print(f"prange-expected-trial-bits={audit.prange_expected_trial_bits:.6f}")
     print(f"enc0-one-probability={audit.zero_inner_product_one_probability:.12g}")
     print(f"decision-cutoff-ones={audit.decision_cutoff_ones}")
     print(f"bit0-failure-probability={audit.bit0_failure_probability:.12g}")
@@ -58,7 +66,12 @@ def main() -> int:
         print(f"meets-trivial-floor={meets}")
         print(f"minimum-weight-for-floor={minimum}")
 
-    print("interpretation=necessary guards only; not a full cryptanalytic security estimate")
+    if args.prange_trial_floor_bits is not None:
+        meets = audit.meets_prange_trial_floor(args.prange_trial_floor_bits)
+        print(f"requested-prange-trial-floor-bits={args.prange_trial_floor_bits:.6f}")
+        print(f"meets-prange-trial-floor={meets}")
+
+    print("interpretation=necessary attack/correctness guards only; Prange trial count omits polynomial per-trial cost")
     return 0
 
 
