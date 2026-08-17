@@ -1,129 +1,94 @@
-# lnat_params.py
-# Parameter sets for LNAT-PQC
-# LNAT-128, LNAT-192, LNAT-256
+"""Experimental parameter profiles for LNAT research.
 
+The names in this module describe state-size profiles only. They are not
+claims of classical, quantum, or NIST security strength.
+"""
+
+from dataclasses import dataclass
+
+SCHEME_VERSION = "LNAT-EXP1"
 IMPLEMENTED_REPETITION_FACTOR = 7
 
 
+@dataclass(frozen=True)
 class LNATParams:
+    """Parameters for an LNAT experiment profile.
+
+    `n`, `m`, and `T` are engineering/research parameters. `kappa` is the
+    message width used by the archived KEM-v1 experiment. None of these
+    values should be interpreted as a proven security level.
     """
-    A parameter set for the LNAT scheme.
 
-    Fields:
-        n         : state size in bits
-        m         : input chunk size in bits
-        kappa     : output size in bits (n // 2)
-        T         : number of automaton steps (public key length)
-        eta       : noise rate (probability of output bit flip)
-        bch_t     : BCH error correction capability (bits)
-        seed_size : private key size in bytes
-        name      : human-readable label
-    """
-    def __init__(self, name, n, m, T, eta, bch_t):
-        self.name      = name
-        self.n         = n
-        self.m         = m
-        self.kappa     = n // 2
-        self.T         = T
-        self.eta       = eta
-        self.bch_t     = bch_t
-        self.seed_size = 32     # always 256-bit seed
+    name: str
+    n: int
+    m: int
+    T: int
+    eta: float
+    kappa: int | None = None
+    seed_size: int = 32
 
-    def __repr__(self):
-        return (
-            f"LNATParams({self.name}: "
-            f"n={self.n}, m={self.m}, T={self.T}, "
-            f"eta={self.eta}, bch_t={self.bch_t})"
-        )
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ValueError("parameter name must be non-empty")
+        if self.n <= 0:
+            raise ValueError("n must be positive")
+        if self.m <= 0:
+            raise ValueError("m must be positive")
+        if self.T <= 0:
+            raise ValueError("T must be positive")
+        if not 0.0 <= self.eta <= 1.0:
+            raise ValueError("eta must be in [0, 1]")
+        if self.seed_size <= 0:
+            raise ValueError("seed_size must be positive")
+        if self.kappa is None:
+            object.__setattr__(self, "kappa", self.n // 2)
+        if self.kappa <= 0:
+            raise ValueError("kappa must be positive")
 
-    def security_classical(self):
-        """Estimated classical security in bits."""
-        return self.n
+    @property
+    def domain_id(self) -> bytes:
+        """Stable identifier used for domain separation."""
+        return f"{SCHEME_VERSION}|{self.name}".encode("ascii")
 
-    def security_quantum(self):
-        """Estimated quantum security in bits (Grover bound)."""
-        return self.n // 2
+    def public_trace_size_bytes(self) -> int:
+        """Size of the current public trace serialization used by KEM-v1."""
+        return 32 + 16 + 4 + (self.T + 7) // 8
 
-    def public_key_size_bytes(self):
-        """
-        Estimated public key size in bytes.
-        seed_A (32) + nonce (16) + length_prefix (4) + Y (ceil(T/8))
-        """
-        seed_A_bytes = 32
-        nonce_bytes  = 16
-        length_bytes = 4
-        Y_bytes      = (self.T + 7) // 8
-        return seed_A_bytes + nonce_bytes + length_bytes + Y_bytes
-
-    def private_key_size_bytes(self):
-        """Private key is just the seed."""
+    def private_seed_size_bytes(self) -> int:
         return self.seed_size
 
-    def ciphertext_size_bytes(self):
-        """
-        Exact ciphertext size for the current reference implementation:
-        ceil((REPEAT * kappa)/8), where REPEAT is the implemented
-        repetition-code factor in src/lnat_kem.py.
-        """
+    def broken_kem_v1_ciphertext_size_bytes(self) -> int:
+        """Ciphertext size of the archived, insecure KEM-v1 experiment."""
         return (IMPLEMENTED_REPETITION_FACTOR * self.kappa + 7) // 8
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Standard parameter sets
-# ──────────────────────────────────────────────────────────────────────────────
-
 LNAT128 = LNATParams(
-    name  = "LNAT-128",
-    n     = 128,       # 128-bit state
-    m     = 8,         # 8-bit input chunks
-    T     = 512,       # 512 automaton steps
-    eta   = 0.05,      # 5% noise rate
-    bch_t = 51,        # corrects up to 51/512 = ~10% errors (2x safety margin)
+    name="LNAT-n128-exp1",
+    n=128,
+    m=8,
+    T=512,
+    eta=0.05,
 )
 
 LNAT192 = LNATParams(
-    name  = "LNAT-192",
-    n     = 192,
-    m     = 8,
-    T     = 768,
-    eta   = 0.05,
-    bch_t = 76,
+    name="LNAT-n192-exp1",
+    n=192,
+    m=8,
+    T=768,
+    eta=0.05,
 )
 
 LNAT256 = LNATParams(
-    name  = "LNAT-256",
-    n     = 256,
-    m     = 16,
-    T     = 1024,
-    eta   = 0.05,
-    bch_t = 102,
+    name="LNAT-n256-exp1",
+    n=256,
+    m=16,
+    T=1024,
+    eta=0.05,
 )
 
-# Default
 DEFAULT_PARAMS = LNAT128
-
-# All parameter sets in a dict for easy lookup
 ALL_PARAMS = {
-    "LNAT-128": LNAT128,
-    "LNAT-192": LNAT192,
-    "LNAT-256": LNAT256,
+    LNAT128.name: LNAT128,
+    LNAT192.name: LNAT192,
+    LNAT256.name: LNAT256,
 }
-
-
-if __name__ == "__main__":
-    print("LNAT Parameter Sets")
-    print("=" * 60)
-    for name, p in ALL_PARAMS.items():
-        print(f"\n{p.name}")
-        print(f"  State size (n):          {p.n} bits")
-        print(f"  Input size (m):          {p.m} bits")
-        print(f"  Steps (T):               {p.T}")
-        print(f"  Noise rate (eta):        {p.eta}")
-        print(f"  BCH correction (t):      {p.bch_t} bits")
-        print(f"  Classical security:      {p.security_classical()} bits")
-        print(f"  Quantum security:        {p.security_quantum()} bits")
-        print(f"  Public key size:         {p.public_key_size_bytes()} bytes")
-        print(f"  Private key size:        {p.private_key_size_bytes()} bytes")
-        print(f"  Ciphertext size:         {p.ciphertext_size_bytes()} bytes")
-    print("\nNote: Sizes above are exact for the current Python reference")
-    print("serialization format. Future BCH/format changes may differ.")

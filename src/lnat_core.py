@@ -1,290 +1,213 @@
-# lnat_core.py
-# Core automaton primitive for LNAT-PQC
-#
-# This file implements:
-#   - LazyTable: the secret transition table derived from a seed
-#   - LNATAutomaton: the finite automaton that runs on inputs
-#   - Noise injection and output function
-#
-# NOTE: This is a REFERENCE implementation — clarity over speed.
-# Do not use in production.
+"""Reference implementation of the LNAT experimental primitive.
 
-import os
-import hmac
+This module intentionally implements a small, auditable research object:
+
+    q_0 = Q0_s(nonce)
+    q_t = Delta_s(q_{t-1}, a_t)
+    z_t = LSB(q_t)
+    y_t = z_t XOR e_t
+
+where Delta_s and Q0_s are derived from HMAC-SHA256 under a secret seed and
+e_t is an independent Bernoulli(eta) noise bit.
+
+No security claim is made for this primitive.
+"""
+
+from __future__ import annotations
+
 import hashlib
+import hmac
 import secrets
-from lnat_params import LNATParams, LNAT128
+from typing import Iterable
+
+from lnat_params import LNAT128, LNATParams
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Pseudorandom Function
-# We use HMAC-SHA256 as a PRF.
-# In a production implementation this would be AES-CTR for speed.
-# ──────────────────────────────────────────────────────────────────────────────
+def _require_bytes(name: str, value: bytes) -> None:
+    if not isinstance(value, bytes):
+        raise TypeError(f"{name} must be bytes")
+
+
+def _domain(params: LNATParams, purpose: bytes) -> bytes:
+    return params.domain_id + b"|" + purpose + b"|"
+
 
 def prf(seed: bytes, domain: bytes, length: int) -> bytes:
-    """
-    Pseudorandom function.
-    PRF(seed, domain) -> length bytes of pseudorandom output.
+    """Expand HMAC-SHA256 in counter mode.
 
-    Uses HMAC-SHA256 in counter mode.
-    Same inputs always produce same outputs.
-    Different seeds produce unrelated outputs.
+    This is an implementation PRF, not a claim that LNAT inherits any
+    particular security bound from HMAC-SHA256.
     """
-    output = b""
+    _require_bytes("seed", seed)
+    _require_bytes("domain", domain)
+    if not seed:
+        raise ValueError("seed must be non-empty")
+    if length < 0:
+        raise ValueError("length must be non-negative")
+
+    output = bytearray()
     counter = 0
     while len(output) < length:
-        h = hmac.new(seed, domain + counter.to_bytes(4, "big"), hashlib.sha256)
-        output += h.digest()
+        block = hmac.new(
+            seed,
+            domain + counter.to_bytes(4, "big"),
+            hashlib.sha256,
+        ).digest()
+        output.extend(block)
         counter += 1
-    return output[:length]
+    return bytes(output[:length])
 
 
 def prf_int(seed: bytes, domain: bytes, n_bits: int) -> int:
-    """
-    PRF returning an integer of exactly n_bits bits.
-    """
+    """Return an integer in [0, 2**n_bits) derived from `prf`."""
+    if n_bits <= 0:
+        raise ValueError("n_bits must be positive")
     n_bytes = (n_bits + 7) // 8
-    raw     = prf(seed, domain, n_bytes)
-    value   = int.from_bytes(raw, "big")
-    mask    = (1 << n_bits) - 1
-    return value & mask
+    value = int.from_bytes(prf(seed, domain, n_bytes), "big")
+    return value & ((1 << n_bits) - 1)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Lazy Transition Table
-# ──────────────────────────────────────────────────────────────────────────────
 
 class LazyTable:
-    """
-    The secret transition table delta: F_2^n x F_2^m -> F_2^n.
-
-    NEVER stored in full — computed on demand from the seed.
-    Same seed always produces same table entry.
-
-    For real security at n=128:
-        Full table = 2^136 entries × 16 bytes = physically impossible to store.
-        LazyTable computes each entry fresh from the seed using a PRF.
-
-    Optimization note:
-        Production implementation would use a PRF tree (lazy subtree caching)
-        to reduce AES calls from O(1) per lookup to O(log n) amortized.
-        This reference uses simple per-entry PRF for clarity.
-    """
+    """Seed-derived transition function evaluated on demand."""
 
     def __init__(self, seed: bytes, params: LNATParams):
-        self.seed   = seed
+        _require_bytes("seed", seed)
+        if len(seed) != params.seed_size:
+            raise ValueError(f"seed must be {params.seed_size} bytes")
+        self.seed = seed
         self.params = params
-        self._cache = {}   # cache recently used entries (LRU in production)
+        self._cache: dict[tuple[int, int], int] = {}
 
     def lookup(self, state: int, inp: int) -> int:
-        """
-        delta(state, input) -> next_state
+        if not isinstance(state, int) or not 0 <= state < (1 << self.params.n):
+            raise ValueError("state is outside the parameter state space")
+        if not isinstance(inp, int) or not 0 <= inp < (1 << self.params.m):
+            raise ValueError("input is outside the parameter input alphabet")
 
-        Deterministic. Same (state, input) always returns same next_state
-        for the same seed.
-        """
         key = (state, inp)
-
         if key not in self._cache:
-            # derive next state from seed + (state, input)
-            inp_bytes  = max(1, (self.params.m + 7) // 8)
-            domain     = b"delta" + \
-                         state.to_bytes(self.params.n // 8, "big") + \
-                         inp.to_bytes(inp_bytes, "big")
-            next_state = prf_int(self.seed, domain, self.params.n)
-            self._cache[key] = next_state
-
-            # keep cache bounded (simple eviction for reference impl)
+            state_bytes = (self.params.n + 7) // 8
+            input_bytes = (self.params.m + 7) // 8
+            message = (
+                _domain(self.params, b"DELTA")
+                + state.to_bytes(state_bytes, "big")
+                + inp.to_bytes(input_bytes, "big")
+            )
+            self._cache[key] = prf_int(self.seed, message, self.params.n)
             if len(self._cache) > 4096:
-                oldest = next(iter(self._cache))
-                del self._cache[oldest]
-
+                del self._cache[next(iter(self._cache))]
         return self._cache[key]
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         self._cache.clear()
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Output Function
-# ──────────────────────────────────────────────────────────────────────────────
-
-def output_function(state: int, params: LNATParams) -> int:
-    """
-    lambda(state) -> kappa-bit output.
-
-    Takes the bottom kappa bits of the state.
-    Simple but effective — the state itself is secret so
-    the output leaks only partial information.
-    """
-    mask = (1 << params.kappa) - 1
-    return state & mask
+def observation_bit(state: int, params: LNATParams) -> int:
+    """Reference observation function lambda(q) = least-significant bit(q)."""
+    if not isinstance(state, int) or not 0 <= state < (1 << params.n):
+        raise ValueError("state is outside the parameter state space")
+    return state & 1
 
 
-def add_noise(output_bit: int, eta: float, rng=None) -> int:
-    """
-    Flip output_bit with probability eta.
-    This is the noise that makes LNAT hard to invert.
-    """
+def add_noise(bit: int, eta: float, rng=None) -> int:
+    """Flip a bit with independent probability `eta`."""
+    if bit not in (0, 1):
+        raise ValueError("bit must be 0 or 1")
+    if not 0.0 <= eta <= 1.0:
+        raise ValueError("eta must be in [0, 1]")
     if rng is None:
         rng = secrets.SystemRandom()
-    if rng.random() < eta:
-        return output_bit ^ 1
-    return output_bit
+    return bit ^ 1 if rng.random() < eta else bit
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# LNAT Automaton Runner
-# ──────────────────────────────────────────────────────────────────────────────
 
 class LNATAutomaton:
-    """
-    The core LNAT automaton.
+    """Reference runner for the LNAT-EXP1 transition/observation process."""
 
-    Given a seed, runs the automaton on an input sequence
-    and produces (optionally noisy) outputs.
-
-    The seed is the private key.
-    The outputs (with noise) form the public key.
-    """
-
-    def __init__(self, seed: bytes, params: LNATParams):
-        """
-        seed   : 32-byte private key
-        params : LNATParams instance
-        """
-        assert len(seed) == params.seed_size, \
-            f"Seed must be {params.seed_size} bytes"
-        self.seed   = seed
+    def __init__(self, seed: bytes, params: LNATParams = LNAT128):
+        _require_bytes("seed", seed)
+        if len(seed) != params.seed_size:
+            raise ValueError(f"seed must be {params.seed_size} bytes")
+        self.seed = seed
         self.params = params
-        self.table  = LazyTable(seed, params)
+        self.table = LazyTable(seed, params)
 
     def derive_q0(self, nonce: bytes) -> int:
-        """
-        Derive the initial state q0 from seed + nonce.
-        A fresh nonce each connection means q0 changes each time.
-        """
-        domain = b"q0" + nonce
-        return prf_int(self.seed, domain, self.params.n)
+        _require_bytes("nonce", nonce)
+        if len(nonce) == 0:
+            raise ValueError("nonce must be non-empty")
+        return prf_int(
+            self.seed,
+            _domain(self.params, b"Q0") + nonce,
+            self.params.n,
+        )
 
-    def run(self,
-            q0: int,
-            input_sequence: list,
-            add_noise_flag: bool = False,
-            rng=None) -> list:
-        """
-        Run the automaton for T steps.
+    def run(
+        self,
+        q0: int,
+        input_sequence: Iterable[int],
+        *,
+        noisy: bool = False,
+        rng=None,
+    ) -> list[int]:
+        if not isinstance(q0, int) or not 0 <= q0 < (1 << self.params.n):
+            raise ValueError("q0 is outside the parameter state space")
 
-        q0             : initial state (integer)
-        input_sequence : list of T integers, each in [0, 2^m)
-        add_noise_flag : if True, flip output bits with prob eta
-        rng            : random source (for noise)
-
-        Returns list of T output integers (each kappa bits).
-        """
-        state   = q0
-        outputs = []
-
+        state = q0
+        outputs: list[int] = []
         for inp in input_sequence:
-            # compute output BEFORE transition (Moore machine style)
-            out = output_function(state, self.params)
-
-            # extract single bit from output for the noisy public key
-            out_bit = out & 1
-
-            if add_noise_flag:
-                out_bit = add_noise(out_bit, self.params.eta, rng)
-
-            outputs.append(out_bit)
-
-            # transition to next state
             state = self.table.lookup(state, inp)
-
+            bit = observation_bit(state, self.params)
+            if noisy:
+                bit = add_noise(bit, self.params.eta, rng)
+            outputs.append(bit)
         return outputs
 
-    def run_noiseless(self, q0: int, input_sequence: list) -> list:
-        """Run without noise. Used during decryption."""
-        return self.run(q0, input_sequence, add_noise_flag=False)
+    def run_noiseless(self, q0: int, input_sequence: Iterable[int]) -> list[int]:
+        return self.run(q0, input_sequence, noisy=False)
 
-    def run_noisy(self, q0: int, input_sequence: list, rng=None) -> list:
-        """Run with noise. Used during key generation."""
-        return self.run(q0, input_sequence, add_noise_flag=True, rng=rng)
+    def run_noisy(self, q0: int, input_sequence: Iterable[int], rng=None) -> list[int]:
+        return self.run(q0, input_sequence, noisy=True, rng=rng)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Key Generation Helper
-# ──────────────────────────────────────────────────────────────────────────────
-
-def generate_seed(params: LNATParams) -> bytes:
-    """
-    Generate a fresh cryptographically random seed.
-    This is the private key. 32 bytes = 256 bits.
-    """
-    return os.urandom(params.seed_size)
+def generate_seed(params: LNATParams = LNAT128) -> bytes:
+    return secrets.token_bytes(params.seed_size)
 
 
-def generate_input_sequence(params: LNATParams, seed_A: bytes = None) -> tuple:
-    """
-    Generate a public input sequence A of length T.
-    Returns (seed_A, A) where seed_A is the 32-byte seed used to expand A.
-    seed_A is published in the public key instead of A itself (saves space).
-    """
+def generate_input_sequence(
+    params: LNATParams,
+    seed_A: bytes | None = None,
+) -> tuple[bytes, list[int]]:
+    """Expand a 32-byte public seed into T values from the input alphabet."""
     if seed_A is None:
-        seed_A = os.urandom(32)
+        seed_A = secrets.token_bytes(32)
+    _require_bytes("seed_A", seed_A)
+    if len(seed_A) != 32:
+        raise ValueError("seed_A must be 32 bytes")
 
-    # expand seed_A into T input values each in [0, 2^m)
-    bytes_per_val = max(1, (params.m + 7) // 8)
-    raw = prf(seed_A, b"input_sequence", params.T * bytes_per_val)
+    bytes_per_value = (params.m + 7) // 8
+    raw = prf(
+        seed_A,
+        _domain(params, b"INPUT-SEQUENCE"),
+        params.T * bytes_per_value,
+    )
     mask = (1 << params.m) - 1
-    
-    A = []
-    for i in range(params.T):
-        chunk = raw[i * bytes_per_val : (i + 1) * bytes_per_val]
-        val = int.from_bytes(chunk, "big") & mask
-        A.append(val)
+    values = []
+    for index in range(params.T):
+        start = index * bytes_per_value
+        chunk = raw[start : start + bytes_per_value]
+        values.append(int.from_bytes(chunk, "big") & mask)
+    return seed_A, values
 
-    return seed_A, A
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Standalone demo
-# ──────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     params = LNAT128
-    print(f"LNAT Core Demo — {params.name}")
-    print("=" * 50)
-
-    # generate private key
     seed = generate_seed(params)
-    print(f"Private seed: {seed.hex()[:32]}... ({len(seed)} bytes)")
-
-    # create automaton
     automaton = LNATAutomaton(seed, params)
-
-    # generate nonce and derive q0
-    nonce = os.urandom(16)
-    q0    = automaton.derive_q0(nonce)
-    print(f"Initial state q0: {q0} (derived from seed + nonce)")
-
-    # generate public input sequence
-    seed_A, A = generate_input_sequence(params)
-    print(f"Input sequence seed: {seed_A.hex()[:16]}... (published)")
-    print(f"Input sequence A: {A[:8]}... (first 8 of {len(A)})")
-
-    # run with noise (public key generation)
-    Y_noisy = automaton.run_noisy(q0, A)
-    print(f"Noisy outputs Y: {Y_noisy[:16]}... (first 16 bits)")
-
-    # run without noise (decryption)
-    Y_clean = automaton.run_noiseless(q0, A)
-    print(f"Clean outputs Y: {Y_clean[:16]}... (first 16 bits)")
-
-    # count noise flips
-    flips = sum(a != b for a, b in zip(Y_noisy, Y_clean))
-    print(f"\nNoise flipped {flips}/{params.T} bits "
-          f"({100*flips/params.T:.1f}%, expected ~{100*params.eta:.0f}%)")
-
-    print("\nCore automaton working correctly.")
-    print("See lnat_kem.py for the full KEM construction.")
+    nonce = secrets.token_bytes(16)
+    q0 = automaton.derive_q0(nonce)
+    seed_A, inputs = generate_input_sequence(params)
+    trace = automaton.run_noisy(q0, inputs)
+    print(f"profile={params.name}")
+    print(f"public-seed={seed_A.hex()[:16]}...")
+    print(f"trace-bits={len(trace)}")
+    print("status=experimental; no security claim")

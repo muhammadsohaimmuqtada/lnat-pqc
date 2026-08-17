@@ -1,7 +1,2 @@
-# LNAT-PQC dependencies
-# Pure Python standard library only — no external dependencies required
-# for the reference implementation.
-#
-# Optional for benchmarking:
-# pycryptodome>=3.15.0   (for AES-based PRF in optimized build)
-# pytest>=7.0            (for running tests with pytest runner)
+# The LNAT reference implementation currently uses only the Python standard library.
+# Install the project itself with: python -m pip install -e .

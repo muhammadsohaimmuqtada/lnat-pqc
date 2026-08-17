@@ -1,170 +1,56 @@
-# LNAT Security Analysis
+# LNAT Security Status
 
-This document covers known attacks, open problems,
-and the current state of the security argument.
+## Current position
 
----
+LNAT-EXP1 is an experimental learning/cryptanalysis target. **No cryptographic security level is claimed.** The archived KEM-v1 is completely broken by public recovery and must not be used.
 
-## The LNAT Hard Problem
+The goal of this repository is now to produce falsifiable definitions, attacks, measurements, and negative results before proposing another cryptographic construction.
 
-**Given:** T pairs (a_t, y_t) where:
-- a_t is a public input (known)
-- y_t = λ(δ(q_{t-1}, a_t)) ⊕ e_t is a noisy output
-- δ is the secret transition function
-- e_t is a noise bit flipped with probability η
+## What is actually implemented
 
-**Goal:** Recover δ (or equivalently, distinguish
-the sequence from random).
+The secret transition function is generated from a fixed-size seed using domain-separated HMAC-SHA256. The public observation at time `t` is the least-significant bit of the post-transition state, optionally flipped by independent Bernoulli noise.
 
----
+This means security analysis must study the implemented seed-derived transition family and trace distribution. Arguments based only on the storage size or count of arbitrary finite-state transition tables are insufficient.
 
-## Known Attacks and Why They Fail
+## KEM-v1 status
 
-### Classical Attacks
+KEM-v1 is not IND-CPA secure. Its mask is the public `pk.Y`, so the encapsulated value is directly recoverable from public information. The repository contains a regression test and standalone attack that reproduce this break.
 
-**Exhaustive search**
-- Key space: 2^(n × 2^(n+m)) possible transition tables
-- At n=128: physically impossible
-- Status: NOT A THREAT
+No Fujisaki-Okamoto transform or CCA wrapper can repair a base construction whose encapsulated secret is already public-recoverable.
 
-**Table reconstruction from observations**
-- Each observation (a_t, y_t) gives a noisy constraint on
-  λ(δ(q_{t-1}, a_t)) — but q_{t-1} is unknown to the attacker
-- Without knowing the state sequence, observations cannot be
-  indexed into the table
-- Even T=2^128 observations would not cover 2^136 table entries
-- Status: NOT A THREAT
+## No parameter security mapping
 
-**Gaussian elimination / linear algebra**
-- Applies only if δ is linear
-- LNAT uses uniformly random δ with no algebraic structure
-- Status: NOT APPLICABLE
+The experiment profiles `LNAT-n128-exp1`, `LNAT-n192-exp1`, and `LNAT-n256-exp1` describe state sizes. They are not estimates of 128/192/256-bit security and are not mapped to NIST levels.
 
-**Algebraic attacks (XL, Groebner bases)**
-- These attack systems of polynomial equations
-- LNAT's transition table has no polynomial structure
-- Status: NOT APPLICABLE
+Any future security estimate must be supported by a defined attack game, concrete best-known attacks, parameter-dependent work factors, and independent review.
 
-**Correlation attacks (on LFSRs)**
-- Apply when output function has low algebraic degree
-- LNAT uses random output function with degree n
-- Status: NOT APPLICABLE
+## Priority attack program
 
-**SAT solver attacks**
-- Could encode LNAT recovery as a SAT/MaxSAT instance
-- At n=128: formula has 2^136 variables — beyond all known solvers
-- At small n (n≤16): SAT solvers CAN recover the table
-- For n≤20, empirical testing recommended
-- Status: RELEVANT ONLY AT VERY SMALL PARAMETERS
+The most useful near-term work is adversarial:
 
-### Quantum Attacks
+1. exhaustive seed/state recovery at deliberately tiny parameters;
+2. SAT/SMT encodings of transition and observation constraints;
+3. statistical distinguishers against clearly defined null distributions;
+4. correlation and state-prediction attacks;
+5. multi-trace attacks with reused secret seeds and varying nonces/input seeds;
+6. sample-complexity measurements;
+7. analysis of whether the LSB observation creates exploitable bias or structure;
+8. analysis of the seed-derived PRF family rather than an ideal arbitrary table.
 
-**Shor's algorithm**
-- Requires hidden subgroup structure in an abelian group
-- LNAT has no group structure
-- Status: NOT APPLICABLE
+## Requirements before KEM-v2
 
-**Quantum walks (Szegedy, Magniez et al.)**
-- Speed up graph search problems
-- LNAT recovery is a function learning problem, not graph search
-- Status: NOT APPLICABLE
+A KEM-v2 proposal should not begin until there is a precise asymmetric mechanism. At minimum, the design must explain why a public-key holder can form a ciphertext/shared secret that the private-key holder can recover while an observer possessing the same public key and ciphertext cannot.
 
-**Grover's algorithm**
-- Searches unstructured space in O(√N) time
-- Applied to LNAT key space: O(2^(n/2)) quantum operations
-- At n=256: O(2^128) — computationally infeasible
-- Status: PROVIDES QUADRATIC SPEEDUP — MITIGATED BY DOUBLING n
+Before any security claim, the repository should contain:
 
-**BKZ / quantum lattice reduction**
-- Specific to lattice problems
-- LNAT has no lattice structure
-- Status: NOT APPLICABLE
+- a complete algorithm specification;
+- explicit correctness and failure definitions;
+- a formal security game;
+- best-known attack implementations for small parameters;
+- parameter rationale derived from those attacks;
+- deterministic test vectors;
+- independent cryptanalysis or review.
 
----
+## Implementation hardening comes later
 
-## Current Security Argument
-
-**Theorem (informal):**
-LNAT-KEM is IND-CPA secure if the LNAT problem is hard.
-
-**Proof sketch:**
-Suppose adversary A breaks LNAT-KEM with non-negligible
-advantage ε. Construct reduction R:
-
-1. R receives LNAT challenge (seed_A, Y)
-2. R sets (seed_A, Y) as the public key
-3. R runs A on this public key
-4. A produces a ciphertext guess
-5. R uses A's output to distinguish LNAT from random
-
-If A's advantage is ε, R's advantage is ε/2.
-This contradicts the hardness of LNAT.
-
-**Status:** This is a sketch. Full formal proof is open.
-
-**IND-CCA2:**
-Applying the Fujisaki-Okamoto transform to the IND-CPA
-scheme gives IND-CCA2 in the random oracle model.
-FO transform security is standard — the only gap is
-completing the IND-CPA proof above.
-
----
-
-## Open Security Problems
-
-1. **Complete the IND-CPA proof**
-   The reduction sketch above needs to be formalized
-   with exact security parameters and error analysis.
-
-2. **Direct reduction from LWE or LPN**
-   Current reduction goes LNAT → noisy MQ.
-   A reduction from LNAT → LPN would provide a stronger
-   hardness argument connecting to well-studied problems.
-
-3. **Tightness of the reduction**
-   Even after completing the proof, the reduction may
-   have polynomial security loss. Tight reductions are
-   preferable.
-
-4. **Side channel analysis**
-   The reference implementation uses standard array
-   indexing which is vulnerable to cache timing attacks.
-   A constant-time (bitsliced) implementation is required
-   for deployment. This is a known open problem.
-
-5. **Distinguishing attacks at small parameters**
-   Empirical testing at n=8, 12, 16, 20 with SAT solvers
-   and constraint propagation would give concrete data
-   on where the practical security threshold lies.
-
----
-
-## Parameters and Security Levels
-
-| Level    | n   | Quantum security | NIST level |
-|----------|-----|------------------|------------|
-| LNAT-128 | 128 | 64 bits          | Level 1    |
-| LNAT-192 | 192 | 96 bits          | Level 3    |
-| LNAT-256 | 256 | 128 bits         | Level 5    |
-
-Note: NIST Level 5 requires 128-bit quantum security.
-LNAT-256 meets this threshold under Grover bounds.
-
----
-
-## What Would Break LNAT
-
-1. A quantum algorithm faster than Grover for unstructured search
-   (would affect ALL post-quantum schemes)
-
-2. A polynomial-time algorithm for noisy multivariate boolean
-   equation solving (would also break all MQ-based schemes)
-
-3. An unexpected algebraic structure in HMAC-SHA256 used as PRF
-   that allows the transition table to be partially reconstructed
-
-4. A mathematical insight specific to finite automaton inversion
-   that has no analogue in existing cryptanalysis
-
-None of these are currently known. All would be significant
-independent results in computational complexity theory.
+Constant-time code, optimized PRFs, embedded implementations, BCH/other coding, and performance benchmarking remain useful engineering topics, but they do not repair a broken construction. They should follow, not precede, evidence that the cryptographic design is meaningful.
