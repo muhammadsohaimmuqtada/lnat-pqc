@@ -41,19 +41,24 @@ class OuterChannelSimulationTests(unittest.TestCase):
             channel_seed=5,
         )
         self.assertEqual(left, right)
+        self.assertEqual(left.codebooks, 1)
+        self.assertEqual(left.trials, 32)
         self.assertAlmostEqual(left.rate, 8 / 96)
         self.assertGreater(left.channel_capacity_bits_per_use, left.rate)
 
-    def test_sweep_returns_requested_lengths(self):
+    def test_sweep_aggregates_multiple_codebooks(self):
         points = sweep_outer_code_lengths(
             message_bits=4,
             channel_uses=(24, 32, 40),
             zero_one_probability=1 / 32,
-            trials=16,
+            trials_per_codebook=8,
+            codebooks=3,
         )
         self.assertEqual(tuple(point.channel_uses for point in points), (24, 32, 40))
-        self.assertTrue(all(point.trials == 16 for point in points))
-        self.assertTrue(all(0 <= point.failures <= 16 for point in points))
+        self.assertTrue(all(point.codebooks == 3 for point in points))
+        self.assertTrue(all(point.trials_per_codebook == 8 for point in points))
+        self.assertTrue(all(point.trials == 24 for point in points))
+        self.assertTrue(all(0 <= point.failures <= 24 for point in points))
 
     def test_invalid_lengths_rejected(self):
         with self.assertRaises(ValueError):
@@ -61,7 +66,17 @@ class OuterChannelSimulationTests(unittest.TestCase):
                 message_bits=8,
                 channel_uses=(8, 16),
                 zero_one_probability=1 / 32,
-                trials=8,
+                trials_per_codebook=8,
+            )
+
+    def test_invalid_codebook_count_rejected(self):
+        with self.assertRaises(ValueError):
+            sweep_outer_code_lengths(
+                message_bits=4,
+                channel_uses=(24,),
+                zero_one_probability=1 / 32,
+                trials_per_codebook=8,
+                codebooks=0,
             )
 
 
