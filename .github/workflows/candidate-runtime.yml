@@ -1,0 +1,26 @@
+name: measured-candidate-runtime
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  full-size-research-roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install research package
+        run: python -m pip install -e .
+      - name: Rank/profile regression tests
+        run: python -m unittest tests.test_gf2_rank_basis tests.test_code_candidate_profiles -v
+      - name: Large generator timing probe
+        run: python experiments/keygen_rank_probe.py
+      - name: Full measured-candidate KeyGen Encap Decap
+        run: python experiments/modern128_full_roundtrip.py
