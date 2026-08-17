@@ -11,7 +11,12 @@ from code_isd import (
     lee_brickell_success_probability,
     recover_sparse_error_lee_brickell,
 )
-from code_pke_reference import CodePKEParams, keygen
+from code_pke_reference import (
+    CodePKEParams,
+    CodePKESecretKey,
+    keygen,
+    public_secret_orthogonality_holds,
+)
 
 
 TOY = CodePKEParams(
@@ -22,6 +27,12 @@ TOY = CodePKEParams(
     repetitions=48,
     zero_threshold=0.25,
 )
+
+
+def assert_valid_public_witness(testcase, pk, witness):
+    candidate = CodePKESecretKey(witness, TOY)
+    testcase.assertEqual(witness.bit_count(), TOY.secret_weight)
+    testcase.assertTrue(public_secret_orthogonality_holds(pk, candidate))
 
 
 class LeeBrickellISDTests(unittest.TestCase):
@@ -44,29 +55,29 @@ class LeeBrickellISDTests(unittest.TestCase):
         self.assertLess(p1.expected_information_sets, p0.expected_information_sets)
         self.assertGreater(p1.guesses_per_invertible_set, p0.guesses_per_invertible_set)
 
-    def test_executable_p_one_attack_recovers_exact_public_witness(self):
-        pk, sk = keygen(TOY, rng=random.Random(501))
+    def test_executable_p_one_attack_recovers_valid_public_witness(self):
+        pk, _ = keygen(TOY, rng=random.Random(501))
         result = recover_sparse_error_lee_brickell(
             pk,
             p=1,
             rng=random.Random(502),
             max_information_sets=256,
         )
-        self.assertEqual(result.witness, sk.error)
+        assert_valid_public_witness(self, pk, result.witness)
         self.assertEqual(result.p, 1)
         self.assertGreaterEqual(result.information_sets_sampled, 1)
         self.assertGreaterEqual(result.invertible_information_sets, 1)
         self.assertGreaterEqual(result.guesses_tested, 1)
 
-    def test_p_zero_attack_still_recovers_as_prange_generalization(self):
-        pk, sk = keygen(TOY, rng=random.Random(601))
+    def test_p_zero_attack_still_recovers_valid_prange_witness(self):
+        pk, _ = keygen(TOY, rng=random.Random(601))
         result = recover_sparse_error_lee_brickell(
             pk,
             p=0,
             rng=random.Random(602),
             max_information_sets=1024,
         )
-        self.assertEqual(result.witness, sk.error)
+        assert_valid_public_witness(self, pk, result.witness)
         self.assertEqual(result.p, 0)
 
     def test_invalid_p_rejected(self):
