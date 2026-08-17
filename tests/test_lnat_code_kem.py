@@ -18,7 +18,7 @@ TEST_PARAMS = LNATCodeKEMParams(
             k=32,
             secret_weight=2,
             encryption_error_weight=1,
-            repetitions=64,
+            repetitions=96,
             zero_threshold=0.25,
         ),
         lnat=LNATParams(
@@ -80,17 +80,34 @@ class LNATCodeKEMTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "confirmation"):
             self.kem.decap(sk, pk, tampered)
 
-    def test_parameter_mismatch_rejected(self):
-        other = LNATCodeKEM0(
+    def test_public_key_bridge_parameter_mismatch_rejected(self):
+        incompatible = LNATCodeKEM0(
             LNATCodeKEMParams(
-                bridge=TEST_PARAMS.bridge,
-                encapsulated_seed_bytes=1,
+                bridge=LNATCodeBridgeParams(
+                    code=CodePKEParams(
+                        n=32,
+                        k=16,
+                        secret_weight=2,
+                        encryption_error_weight=1,
+                        repetitions=64,
+                        zero_threshold=0.25,
+                    ),
+                    lnat=LNATParams(
+                        name="LNAT-code-kem-other",
+                        n=32,
+                        m=4,
+                        T=32,
+                        eta=0.0,
+                        seed_size=32,
+                    ),
+                ),
+                encapsulated_seed_bytes=2,
                 confirmation_tag_bytes=16,
             )
         )
         pk, _ = self.kem.keygen(rng=random.Random(1601))
         with self.assertRaisesRegex(ValueError, "parameter mismatch"):
-            other.encap(pk, rng=random.Random(1602))
+            incompatible.encap(pk, rng=random.Random(1602))
 
 
 if __name__ == "__main__":
