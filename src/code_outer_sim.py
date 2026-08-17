@@ -7,7 +7,7 @@ applies its sparse witness:
     P(Y=1 | X=1) = 1/2
 
 It avoids constructing full random-code ciphertext words, making rate/reliability
-sweeps cheap enough for CI.  The full bridge path remains separately tested.
+sweeps cheap enough for CI. The full bridge path remains separately tested.
 """
 
 from __future__ import annotations
@@ -24,9 +24,14 @@ from code_outer_channel import OuterLinearCode, decode_outer_ml, generate_outer_
 class FiniteBlocklengthPoint:
     message_bits: int
     channel_uses: int
-    trials: int
+    codebooks: int
+    trials_per_codebook: int
     failures: int
     channel_capacity_bits_per_use: float
+
+    @property
+    def trials(self) -> int:
+        return self.codebooks * self.trials_per_codebook
 
     @property
     def rate(self) -> float:
@@ -66,17 +71,16 @@ def sample_channel_observation(
     return observed
 
 
-def simulate_outer_code(
+def simulate_outer_code_failures(
     outer: OuterLinearCode,
     *,
     zero_one_probability: float,
     trials: int,
     message_seed: int,
     channel_seed: int,
-) -> FiniteBlocklengthPoint:
+) -> int:
     if trials <= 0:
         raise ValueError("trials must be positive")
-    capacity = code_bit_channel_capacity(zero_one_probability).capacity_bits_per_use
     message_rng = random.Random(message_seed)
     channel_rng = random.Random(channel_seed)
     failures = 0
@@ -96,11 +100,31 @@ def simulate_outer_code(
             zero_one_probability=zero_one_probability,
         )
         failures += recovered != message
+    return failures
 
+
+def simulate_outer_code(
+    outer: OuterLinearCode,
+    *,
+    zero_one_probability: float,
+    trials: int,
+    message_seed: int,
+    channel_seed: int,
+) -> FiniteBlocklengthPoint:
+    """Compatibility helper for one outer codebook."""
+    failures = simulate_outer_code_failures(
+        outer,
+        zero_one_probability=zero_one_probability,
+        trials=trials,
+        message_seed=message_seed,
+        channel_seed=channel_seed,
+    )
+    capacity = code_bit_channel_capacity(zero_one_probability).capacity_bits_per_use
     return FiniteBlocklengthPoint(
         message_bits=outer.message_bits,
         channel_uses=outer.channel_uses,
-        trials=trials,
+        codebooks=1,
+        trials_per_codebook=trials,
         failures=failures,
         channel_capacity_bits_per_use=capacity,
     )
@@ -111,7 +135,8 @@ def sweep_outer_code_lengths(
     message_bits: int,
     channel_uses: Iterable[int],
     zero_one_probability: float,
-    trials: int,
+    trials_per_codebook: int,
+    codebooks: int = 4,
     code_seed: int = 70_000,
     message_seed: int = 71_000,
     channel_seed: int = 72_000,
@@ -121,21 +146,37 @@ def sweep_outer_code_lengths(
         raise ValueError("at least one channel length is required")
     if any(length <= message_bits for length in lengths):
         raise ValueError("every channel length must exceed message_bits")
+    if trials_per_codebook <= 0:
+        raise ValueError("trials_per_codebook must be positive")
+    if codebooks <= 0:
+        raise ValueError("codebooks must be positive")
 
+    capacity = code_bit_channel_capacity(zero_one_probability).capacity_bits_per_use
     points = []
-    for index, length in enumerate(lengths):
-        outer = generate_outer_linear_code(
-            message_bits,
-            length,
-            rng=random.Random(code_seed + index),
-        )
-        points.append(
-            simulate_outer_code(
+    for length_index, length in enumerate(lengths):
+        failures = 0
+        for codebook_index in range(codebooks):
+            seed_offset = length_index * 100 + codebook_index
+            outer = generate_outer_linear_code(
+                message_bits,
+                length,
+                rng=random.Random(code_seed + seed_offset),
+            )
+            failures += simulate_outer_code_failures(
                 outer,
                 zero_one_probability=zero_one_probability,
-                trials=trials,
-                message_seed=message_seed + index,
-                channel_seed=channel_seed + index,
+                trials=trials_per_codebook,
+                message_seed=message_seed + seed_offset,
+                channel_seed=channel_seed + seed_offset,
+            )
+        points.append(
+            FiniteBlocklengthPoint(
+                message_bits=message_bits,
+                channel_uses=length,
+                codebooks=codebooks,
+                trials_per_codebook=trials_per_codebook,
+                failures=failures,
+                channel_capacity_bits_per_use=capacity,
             )
         )
     return tuple(points)
