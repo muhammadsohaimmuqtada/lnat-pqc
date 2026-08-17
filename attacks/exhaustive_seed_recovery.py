@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exhaustive seed recovery baseline for deliberately tiny LNAT profiles."""
+"""Exact exhaustive seed recovery for deliberately tiny LNAT profiles."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from lnat_analysis import exhaustive_seed_recovery, make_observation
+from lnat_analysis import exhaustive_seed_recovery_pruned, make_observation
 from lnat_params import LNATParams
 
 
@@ -25,6 +25,7 @@ def main() -> int:
         parser.error("--traces must be positive")
     if not 0 <= args.noise <= 1:
         parser.error("--noise must be in [0,1]")
+
     seed_size = int(args.seed_bits) // 8
     params = LNATParams(
         name=f"LNAT-attack-seed{args.seed_bits}",
@@ -38,6 +39,7 @@ def main() -> int:
     secret = bytes.fromhex(args.secret) if args.secret else default_seed
     if len(secret) != seed_size:
         parser.error(f"secret must be exactly {seed_size} byte(s)")
+
     observations = [
         make_observation(
             secret,
@@ -49,14 +51,19 @@ def main() -> int:
         )
         for index in range(args.traces)
     ]
-    recovered, score, tested = exhaustive_seed_recovery(observations, params)
+    result = exhaustive_seed_recovery_pruned(observations, params)
+
     print(f"profile={params.name}")
     print(f"secret={secret.hex()}")
-    print(f"recovered={recovered.hex()}")
-    print(f"hamming-score={score}")
-    print(f"candidates-tested={tested}")
-    print(f"success={recovered == secret}")
-    return 0 if recovered == secret else 1
+    print(f"recovered={result.seed.hex()}")
+    print(f"hamming-score={result.score}")
+    print(f"candidates-tested={result.candidates_tested}")
+    print(f"candidates-pruned={result.candidates_pruned}")
+    print(f"bit-comparisons={result.bit_comparisons}")
+    print(f"full-bit-comparisons={result.full_bit_comparisons}")
+    print(f"comparison-savings={100 * result.savings_fraction:.2f}%")
+    print(f"success={result.seed == secret}")
+    return 0 if result.seed == secret else 1
 
 
 if __name__ == "__main__":
