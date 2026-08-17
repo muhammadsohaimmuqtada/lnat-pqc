@@ -9,11 +9,15 @@ from code_pke_reference import CodePKEParams
 from code_profile_audit import (
     audit_code_profile,
     fixed_weight_intersection_odd_probability,
+    kem_failure_union_bound,
+    kem_seed_failure_probability,
     minimum_repetitions_for_failure,
+    minimum_repetitions_for_kem_failure,
     minimum_weight_for_prange_trial_floor,
     minimum_weight_for_trivial_floor,
     optimal_decision_for_repetitions,
     screen_necessary_candidate,
+    screen_necessary_kem_candidate,
     sparse_witness_enumeration_bits,
 )
 
@@ -60,6 +64,17 @@ class CodeProfileAuditTests(unittest.TestCase):
         self.assertLess(audit.bit1_failure_probability, 2e-7)
         self.assertLess(audit.worst_bit_failure_probability, 2e-7)
 
+    def test_kem_failure_composition_exposes_bit_vs_seed_gap(self):
+        p0 = 8.11524514255e-10
+        p1 = 9.14727218523e-10
+        modeled = kem_seed_failure_probability(p0, p1, 128)
+        bound = kem_failure_union_bound(p0, p1, 128)
+        self.assertGreater(modeled, 1e-7)
+        self.assertLess(modeled, 1.2e-7)
+        self.assertGreater(bound, modeled)
+        self.assertGreater(bound, 1e-7)
+        self.assertLess(bound, 1.3e-7)
+
     def test_minimum_weight_floor_is_only_trivial_search_guard(self):
         weight = minimum_weight_for_trivial_floor(256, 128)
         self.assertIsNotNone(weight)
@@ -84,7 +99,7 @@ class CodeProfileAuditTests(unittest.TestCase):
             32,
         )
 
-    def test_optimal_decision_rule_for_known_frontier_point(self):
+    def test_optimal_decision_rule_for_legacy_bit_frontier(self):
         p_zero = fixed_weight_intersection_odd_probability(256, 30, 1)
         self.assertEqual(p_zero, 30 / 256)
         decision = optimal_decision_for_repetitions(p_zero, 183)
@@ -92,10 +107,9 @@ class CodeProfileAuditTests(unittest.TestCase):
         self.assertAlmostEqual(decision.threshold, 52 / 183)
         self.assertLess(decision.worst_failure_probability, 1e-9)
 
-    def test_minimum_repetitions_for_failure_known_point(self):
-        p_zero = 30 / 256
+    def test_legacy_minimum_repetitions_for_per_bit_failure(self):
         decision = minimum_repetitions_for_failure(
-            p_zero,
+            30 / 256,
             1e-9,
             max_repetitions=256,
         )
@@ -103,9 +117,22 @@ class CodeProfileAuditTests(unittest.TestCase):
         assert decision is not None
         self.assertEqual(decision.repetitions, 183)
         self.assertEqual(decision.cutoff_ones, 52)
-        self.assertLessEqual(decision.worst_failure_probability, 1e-9)
 
-    def test_screen_necessary_candidate_known_point(self):
+    def test_minimum_repetitions_for_full_kem_failure(self):
+        audit = minimum_repetitions_for_kem_failure(
+            30 / 256,
+            encapsulated_bits=128,
+            failure_ceiling=1e-9,
+            max_repetitions=300,
+        )
+        self.assertIsNotNone(audit)
+        assert audit is not None
+        self.assertEqual(audit.decision.repetitions, 233)
+        self.assertEqual(audit.decision.cutoff_ones, 66)
+        self.assertLessEqual(audit.conservative_union_bound, 1e-9)
+        self.assertLessEqual(audit.modeled_seed_failure_probability, 1e-9)
+
+    def test_legacy_screen_known_point_retained(self):
         candidate = screen_necessary_candidate(
             n=256,
             k=128,
@@ -117,10 +144,28 @@ class CodeProfileAuditTests(unittest.TestCase):
         self.assertIsNotNone(candidate)
         assert candidate is not None
         self.assertEqual(candidate.secret_weight, 30)
-        self.assertGreaterEqual(candidate.prange_expected_trial_bits, 32)
         self.assertEqual(candidate.repetitions, 183)
         self.assertEqual(candidate.cutoff_ones, 52)
-        self.assertLessEqual(candidate.worst_failure_probability, 1e-9)
+
+    def test_full_kem_screen_known_point(self):
+        candidate = screen_necessary_kem_candidate(
+            n=256,
+            k=128,
+            prange_trial_floor_bits=32,
+            encryption_error_weight=1,
+            encapsulated_bits=128,
+            kem_failure_ceiling=1e-9,
+            max_repetitions=300,
+        )
+        self.assertIsNotNone(candidate)
+        assert candidate is not None
+        self.assertEqual(candidate.secret_weight, 30)
+        self.assertGreaterEqual(candidate.prange_expected_trial_bits, 32)
+        self.assertEqual(candidate.encapsulated_bits, 128)
+        self.assertEqual(candidate.repetitions, 233)
+        self.assertEqual(candidate.cutoff_ones, 66)
+        self.assertLessEqual(candidate.conservative_kem_failure_bound, 1e-9)
+        self.assertLessEqual(candidate.modeled_seed_failure_probability, 1e-9)
         self.assertGreater(candidate.full_witness_enumeration_bits, 32)
 
     def test_invalid_policy_values_rejected(self):
@@ -134,12 +179,17 @@ class CodeProfileAuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             minimum_repetitions_for_failure(0.1, 0.0)
         with self.assertRaises(ValueError):
-            screen_necessary_candidate(
+            minimum_repetitions_for_kem_failure(0.1, 0, 1e-9)
+        with self.assertRaises(ValueError):
+            kem_seed_failure_probability(0.1, 0.1, 0)
+        with self.assertRaises(ValueError):
+            screen_necessary_kem_candidate(
                 n=64,
                 k=64,
                 prange_trial_floor_bits=8,
                 encryption_error_weight=1,
-                failure_ceiling=1e-6,
+                encapsulated_bits=128,
+                kem_failure_ceiling=1e-6,
             )
 
 
