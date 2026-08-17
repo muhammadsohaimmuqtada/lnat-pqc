@@ -18,17 +18,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: ISD unit tests
-        run: python -m unittest tests.test_code_isd tests.test_code_stern tests.test_code_sd_estimator -v
+      - name: ISD/frontier unit tests
+        run: python -m unittest tests.test_code_isd tests.test_code_stern tests.test_code_sd_estimator tests.test_code_modern_frontier tests.test_code_modern_frontier_real -v
       - name: Executable Lee-Brickell probe
         run: python experiments/lee_brickell_probe.py
       - name: Executable Stern collision probe
         run: python experiments/stern_probe.py
-      - name: Compile ISD modules
-        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py experiments/modern_isd_scale_probe.py
+      - name: Compile ISD/frontier modules
+        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py src/code_modern_frontier.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py tests/test_code_modern_frontier.py tests/test_code_modern_frontier_real.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py experiments/modern_isd_scale_probe.py experiments/modern_frontier_probe.py
 
-  upstream-modern-estimator:
+  upstream-modern-frontier:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,26 +37,14 @@ jobs:
           python-version: "3.11"
       - name: Install pinned estimator bridge
         run: python -m pip install -e ".[estimator]"
-      - name: Run estimator bridge tests
-        run: python -m unittest tests.test_code_sd_estimator -v
-      - name: Cross-check rejected active profile
-        run: python experiments/upstream_isd_probe.py --n 256 --k 128 --weight 48 --top 8
+      - name: Run pinned estimator/frontier regressions
+        run: python -m unittest tests.test_code_sd_estimator tests.test_code_modern_frontier tests.test_code_modern_frontier_real -v
+      - name: Exercise measured 128-bit research screen
+        run: python experiments/modern_frontier_probe.py --n 1064 --k 532 --weight 117 --attack-floor-bits 128 --max-repetitions 512
 
-  upstream-scale:
+  upstream-boundary-fail:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        point:
-          - "256:128:28"
-          - "512:256:56"
-          - "1024:512:112"
-          - "1056:528:116"
-          - "1072:536:117"
-          - "1088:544:119"
-          - "1152:576:126"
-          - "1536:768:156"
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -63,5 +52,5 @@ jobs:
           python-version: "3.11"
       - name: Install pinned estimator bridge
         run: python -m pip install -e ".[estimator]"
-      - name: Measure near-GV modern-ISD candidate
-        run: python experiments/modern_isd_scale_probe.py --point "${{ matrix.point }}"
+      - name: Reproduce lower-weight boundary measurement
+        run: python experiments/modern_isd_scale_probe.py --point 1064:532:116
