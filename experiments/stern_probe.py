@@ -10,7 +10,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from code_isd import best_lee_brickell_cost
-from code_pke_reference import CodePKEParams, keygen
+from code_pke_reference import (
+    CodePKEParams,
+    CodePKESecretKey,
+    keygen,
+    public_secret_orthogonality_holds,
+)
 from code_stern import best_stern_cost, recover_sparse_error_stern
 
 
@@ -23,7 +28,7 @@ def main() -> int:
         repetitions=48,
         zero_threshold=0.25,
     )
-    pk, sk = keygen(toy, rng=random.Random(10))
+    pk, original_sk = keygen(toy, rng=random.Random(10))
     recovered = recover_sparse_error_stern(
         pk,
         p=1,
@@ -32,12 +37,15 @@ def main() -> int:
         max_information_sets=512,
     )
 
+    candidate_sk = CodePKESecretKey(recovered.witness, toy)
+    valid = public_secret_orthogonality_holds(pk, candidate_sk)
+    exact = recovered.witness == original_sk.error
     lee = best_lee_brickell_cost(256, 128, 30, max_p=4)
     stern = best_stern_cost(256, 128, 30, max_p=4, max_l=24)
 
-    exact = recovered.witness == sk.error
     print("attack=Stern-style collision information-set decoding")
-    print(f"toy-exact={exact}")
+    print(f"toy-valid-public-witness={valid}")
+    print(f"toy-original-witness={exact}")
     print(f"toy-information-sets={recovered.information_sets_sampled}")
     print(f"toy-invertible-sets={recovered.invertible_information_sets}")
     print(f"toy-left-list-entries={recovered.left_list_entries}")
@@ -51,8 +59,8 @@ def main() -> int:
     print(f"stern-estimated-op-bits={stern.estimated_total_ops_bits:.6f}")
     print(f"stern-memory-entry-bits={stern.estimated_memory_bits:.6f}")
     print(f"modeled-op-bit-reduction={lee.estimated_total_ops_bits - stern.estimated_total_ops_bits:.6f}")
-    print("interpretation=executable collision baseline + transparent model; not security bits")
-    return 0 if exact else 1
+    print("interpretation=valid public witness is attack objective; model remains screening-only")
+    return 0 if valid else 1
 
 
 if __name__ == "__main__":
