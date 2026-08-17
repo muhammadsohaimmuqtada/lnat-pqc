@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: ISD/frontier unit tests
-        run: python -m unittest tests.test_code_isd tests.test_code_stern tests.test_code_sd_estimator tests.test_code_modern_frontier tests.test_code_modern_frontier_real tests.test_code_quantum_isd -v
+        run: python -m unittest tests.test_code_isd tests.test_code_stern tests.test_code_sd_estimator tests.test_code_modern_frontier tests.test_code_modern_frontier_real tests.test_code_quantum_isd tests.test_code_post_quantum_frontier -v
       - name: Executable Lee-Brickell probe
         run: python experiments/lee_brickell_probe.py
       - name: Executable Stern collision probe
@@ -27,7 +27,7 @@ jobs:
       - name: Reject classical-only frontier under quantum screen
         run: python experiments/quantum_isd_probe.py --n 1064 --k 532 --weight 117 --iteration-floor-bits 128 --expect reject
       - name: Compile ISD/frontier modules
-        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py src/code_modern_frontier.py src/code_quantum_isd.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py tests/test_code_modern_frontier.py tests/test_code_modern_frontier_real.py tests/test_code_quantum_isd.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py experiments/modern_isd_scale_probe.py experiments/modern_frontier_probe.py experiments/quantum_isd_probe.py
+        run: python -m compileall -q src/code_isd.py src/code_stern.py src/code_sd_estimator.py src/code_modern_frontier.py src/code_quantum_isd.py src/code_post_quantum_frontier.py tests/test_code_isd.py tests/test_code_stern.py tests/test_code_sd_estimator.py tests/test_code_modern_frontier.py tests/test_code_modern_frontier_real.py tests/test_code_quantum_isd.py tests/test_code_post_quantum_frontier.py experiments/lee_brickell_probe.py experiments/stern_probe.py experiments/upstream_isd_probe.py experiments/modern_isd_scale_probe.py experiments/modern_frontier_probe.py experiments/quantum_isd_probe.py
 
   upstream-modern-frontier:
     runs-on: ubuntu-latest
