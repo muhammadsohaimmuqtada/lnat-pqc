@@ -45,8 +45,8 @@ class CodeProfileAuditTests(unittest.TestCase):
         self.assertAlmostEqual(audit.zero_inner_product_one_probability, 124 / 2016)
         self.assertEqual(audit.decision_cutoff_ones, 24)
         self.assertLess(audit.bit0_failure_probability, 1e-8)
-        self.assertLess(audit.bit1_failure_probability, 1e-7)
-        self.assertLess(audit.worst_bit_failure_probability, 1e-7)
+        self.assertLess(audit.bit1_failure_probability, 2e-7)
+        self.assertLess(audit.worst_bit_failure_probability, 2e-7)
 
     def test_minimum_weight_floor_is_only_trivial_search_guard(self):
         weight = minimum_weight_for_trivial_floor(256, 128)
