@@ -33,8 +33,18 @@ def main() -> int:
     parser.add_argument("--encapsulated-bits", type=int, default=128)
     parser.add_argument("--kem-failure-ceiling", type=float, default=1e-9)
     parser.add_argument("--max-repetitions", type=int, default=512)
+    parser.add_argument(
+        "--expect",
+        choices=("any", "pass", "reject"),
+        default="any",
+        help="enforce a combined-screen result; pass/reject requires exactly one --point",
+    )
     args = parser.parse_args()
 
+    if args.expect != "any" and len(args.point) != 1:
+        parser.error("--expect pass/reject requires exactly one --point")
+
+    observed: list[bool] = []
     for n, k, weight in args.point:
         assessment = assess_post_quantum_candidate(
             n,
@@ -52,6 +62,7 @@ def main() -> int:
             quantum_iteration_floor_bits=args.quantum_floor_bits,
             kem_failure_ceiling=args.kem_failure_ceiling,
         )
+        observed.append(passed)
 
         print(f"point={n}:{k}:{weight}")
         print(f"classical-upstream-package={classical.upstream_package_version}")
@@ -78,9 +89,10 @@ def main() -> int:
         )
         print()
 
-    # Measurement mode deliberately succeeds even when candidates are rejected.
-    # The printed pass/fail field is the result; CI should not promote a point
-    # merely because this process exits successfully.
+    if args.expect == "pass" and not observed[0]:
+        return 1
+    if args.expect == "reject" and observed[0]:
+        return 1
     return 0
 
 
