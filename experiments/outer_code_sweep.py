@@ -26,14 +26,17 @@ def _parse_lengths(value: str) -> tuple[int, ...]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--message-bits", type=int, default=8)
-    parser.add_argument("--lengths", type=_parse_lengths, default=(48, 64, 80, 96, 112, 128))
-    parser.add_argument("--trials", type=int, default=64)
+    parser.add_argument("--lengths", type=_parse_lengths, default=(36, 40, 44, 48, 56, 64))
+    parser.add_argument("--trials-per-codebook", type=int, default=32)
+    parser.add_argument("--codebooks", type=int, default=4)
     parser.add_argument("--q", type=float, default=1 / 32)
     args = parser.parse_args()
     if args.message_bits <= 0:
         parser.error("--message-bits must be positive")
-    if args.trials <= 0:
-        parser.error("--trials must be positive")
+    if args.trials_per_codebook <= 0:
+        parser.error("--trials-per-codebook must be positive")
+    if args.codebooks <= 0:
+        parser.error("--codebooks must be positive")
     if not 0 <= args.q < 0.5:
         parser.error("--q must be in [0,0.5)")
 
@@ -42,19 +45,22 @@ def main() -> int:
         message_bits=args.message_bits,
         channel_uses=args.lengths,
         zero_one_probability=args.q,
-        trials=args.trials,
+        trials_per_codebook=args.trials_per_codebook,
+        codebooks=args.codebooks,
     )
 
     print(f"q={args.q:.12f}")
     print(f"capacity-bits-per-use={channel.capacity_bits_per_use:.12f}")
-    print("message_bits,channel_uses,rate,capacity_fraction,trials,failures,failure_rate")
+    print(f"codebooks={args.codebooks}")
+    print(f"trials-per-codebook={args.trials_per_codebook}")
+    print("message_bits,channel_uses,rate,capacity_fraction,total_trials,failures,failure_rate")
     for point in points:
         print(
             f"{point.message_bits},{point.channel_uses},{point.rate:.12f},"
             f"{point.capacity_fraction:.12f},{point.trials},{point.failures},"
             f"{point.empirical_failure_rate:.12f}"
         )
-    print("interpretation=finite deterministic sample only; use larger Monte Carlo before selecting a production code")
+    print("interpretation=multi-codebook finite sample only; larger Monte Carlo and structured-code analysis remain required")
     return 0
 
 
