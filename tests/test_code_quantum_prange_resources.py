@@ -39,7 +39,7 @@ class QuantumPrangeResourceTests(unittest.TestCase):
         self.assertAlmostEqual(estimate.grover_iteration_bits, 127.676563091552, places=9)
         self.assertEqual(estimate.width_optimized_qubits, 721_643)
         self.assertEqual(estimate.depth_optimized_qubits, 1_438_205)
-        self.assertAlmostEqual(estimate.width_optimized_depth_scale_bits, 163.278287166019, places=9)
+        self.assertAlmostEqual(estimate.width_optimized_depth_scale_bits, 163.626791036547, places=9)
         self.assertEqual(estimate.reference_repository, "qiboteam/qISD")
         self.assertEqual(
             estimate.reference_commit,
@@ -52,14 +52,20 @@ class QuantumPrangeResourceTests(unittest.TestCase):
             64.0 + math.log2(math.pi / 4.0),
         )
 
-    def test_depth_scale_adds_table2_polynomial_factor(self):
+    def test_depth_scale_keeps_table2_expression_literal(self):
         b = 128.0
         expected = (
-            idealized_grover_iteration_bits(b)
+            0.5 * b
             + 3.0 * math.log2(256)
             + math.log2(math.log2(256))
         )
         self.assertAlmostEqual(width_optimized_depth_scale_bits(256, b), expected)
+        self.assertNotAlmostEqual(
+            width_optimized_depth_scale_bits(256, b),
+            idealized_grover_iteration_bits(b)
+            + 3.0 * math.log2(256)
+            + math.log2(math.log2(256)),
+        )
 
     def test_invalid_inputs_rejected(self):
         with self.assertRaises(ValueError):
