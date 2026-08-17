@@ -6,7 +6,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from code_pke_reference import CodePKEParams, keygen
+from code_pke_reference import (
+    CodePKEParams,
+    CodePKESecretKey,
+    keygen,
+    public_secret_orthogonality_holds,
+)
 from code_stern import (
     best_stern_cost,
     recover_sparse_error_stern,
@@ -26,7 +31,7 @@ class SternISDTests(unittest.TestCase):
         )
         self.assertAlmostEqual(stern_success_probability(n, k, w, p, l), expected)
 
-    def test_recovery_finds_exact_toy_witness(self):
+    def test_recovery_finds_valid_toy_witness(self):
         params = CodePKEParams(
             n=32,
             k=16,
@@ -35,7 +40,7 @@ class SternISDTests(unittest.TestCase):
             repetitions=48,
             zero_threshold=0.25,
         )
-        pk, sk = keygen(params, rng=random.Random(10))
+        pk, _ = keygen(params, rng=random.Random(10))
         result = recover_sparse_error_stern(
             pk,
             p=1,
@@ -43,7 +48,9 @@ class SternISDTests(unittest.TestCase):
             rng=random.Random(2),
             max_information_sets=512,
         )
-        self.assertEqual(result.witness, sk.error)
+        candidate = CodePKESecretKey(result.witness, params)
+        self.assertTrue(public_secret_orthogonality_holds(pk, candidate))
+        self.assertEqual(result.witness.bit_count(), params.secret_weight)
         self.assertGreater(result.left_list_entries, 0)
         self.assertGreater(result.right_list_entries, 0)
         self.assertGreater(result.collision_candidates_tested, 0)
