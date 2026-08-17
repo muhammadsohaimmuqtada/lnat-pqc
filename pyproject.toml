@@ -41,5 +41,6 @@ py-modules = [
   "code_sd_estimator",
   "code_modern_frontier",
   "code_quantum_isd",
+  "code_post_quantum_frontier",
 ]
 package-dir = { "" = "src" }
