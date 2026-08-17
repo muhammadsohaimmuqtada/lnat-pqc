@@ -80,7 +80,7 @@ clamped to 1.
 
 ## 6. Current measured modern frontier
 
-The modern scaling probe has already invalidated the dense n=256 candidate and moved the research frontier substantially upward.
+The modern scaling probe invalidated the dense n=256 candidate and moved the research frontier substantially upward.
 
 Measured examples with the pinned estimator include:
 
@@ -88,12 +88,16 @@ Measured examples with the pinned estimator include:
 (256,128,w=28)    -> ~40.082 effective attack bits
 (512,256,w=52)    -> ~64.839 modeled upstream attack bits
 (1024,512,w=104)  -> ~115.373 modeled upstream attack bits
-(1056,528,w=116)  -> ~127.669 effective attack bits; below a 128-bit screen
-(1072,536,w=117)  -> ~128.615 effective attack bits; above a 128-bit screen
+(1056,528,w=116)  -> ~127.669 effective attack bits; reject at a 128-bit screen
+(1064,532,w=116)  -> ~127.612 effective attack bits; reject at a 128-bit screen
+(1072,536,w=117)  -> ~128.615 effective attack bits; passes the current 128-bit screen
+(1088,544,w=119)  -> ~130.540 modeled upstream attack bits
 (1536,768,w=156)  -> ~164.819 modeled upstream attack bits
 ```
 
-A focused measurement at `n=1064` is used to narrow the current 128-bit screening transition further. Until that measurement is fixed in CI, `(1072,536,w=117)` is only the smallest **measured passing point in the existing bracket**, not a standardized parameter set.
+For the measured `(1072,536,w=117)` point, the selected correctness rule uses 220 repetitions with cutoff 61 and has a conservative 128-bit-seed KEM failure bound of approximately `6.996e-10`.
+
+`(1072,536,w=117)` is therefore the first passing point in the focused measured bracket `1056 -> 1064 -> 1072`. It is an **active research screening candidate only**, not a standardized or deployment parameter set.
 
 ## 7. Tooling
 
