@@ -33,7 +33,7 @@ The supplementary qISD repository constructs the circuits in Qibo, emits QASM/ci
 n^3 log(n) / sqrt(q)
 ```
 
-The fourth value is deliberately called a **scale**, not an exact circuit depth. The published expression hides multiplicative constants and does not by itself provide a Toffoli count, Clifford+T count, surface-code cost, wall-clock time, or security level.
+The fourth value keeps the published asymptotic expression literal. It does **not** inject the separate `pi/4` Grover constant because Table 2 states the depth only up to big-O multiplicative constants. It is deliberately called a **scale**, not an exact circuit depth, and does not by itself provide a Toffoli count, Clifford+T count, surface-code cost, wall-clock time, or security level.
 
 ## Current focused combined-screen point
 
@@ -46,7 +46,7 @@ idealized Grover iteration bits            127.676563092
 idealized Grover iterations                ~2.7194e38
 width-optimized logical qubits             721,643
 depth-oriented full logical qubits         1,438,205
-Table-2 width-optimized depth-scale bits   163.278287166
+Table-2 width-optimized depth-scale bits   163.626791037
 ```
 
 The width-optimized logical-qubit formula is
@@ -65,7 +65,7 @@ These figures make the resource assumption visible: even the width-optimized pub
 
 ## What this changes
 
-The earlier `code_quantum_isd.py` value of about `128.025` for `(1694,847,w=230)` is an exponent-only **rejection baseline** based on halving the classical Prange search exponent. The resource module now exposes that the actual paper-grounded Prange circuit also carries a very large logical-qubit footprint and a polynomial-depth factor.
+The earlier `code_quantum_isd.py` value of about `128.025` for `(1694,847,w=230)` is an exponent-only **rejection baseline** based on halving the classical Prange search exponent. The resource module now exposes that the paper-grounded Prange circuit also carries a very large logical-qubit footprint and a polynomial-depth factor.
 
 This does **not** make `(1694,847,w=230)` secure. Stronger quantum ISD algorithms such as the Kachigar--Tillich/Kirshanova quantum-walk variants remain outside the finite resource model, and the current Prange depth expression is asymptotic rather than a fault-tolerant gate estimate.
 
