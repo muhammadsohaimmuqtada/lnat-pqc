@@ -60,3 +60,22 @@ expected information-set trials, before accounting for the polynomial linear-alg
 `src/code_attacks.py` implements this reduced-parameter decoder, and `attacks/bridge_sparse_witness_recovery.py` requires both public recovery methods to succeed and decrypt the test ciphertexts.
 
 This result is deliberately recorded because **master-seed length is not a security metric** when the public hidden object can be attacked directly. Future bridge parameters must be evaluated against concrete decoding/ISD/BKW-style attack costs rather than against the LNAT seed size or full witness count alone.
+
+## LNAT-CODE-KEM-0 toy profiles: complete public decapsulation after decoding
+
+**Status:** expected complete break of the deliberately tiny KEM parameters; reproducible.
+
+`LNAT-CODE-KEM-0` encrypts a random seed bit-by-bit using the same public random-code relation and then derives the session key from that seed, public context, ciphertext body, and a confirmation tag.
+
+The confirmation tag catches wrong-key and tampering failures, but it does not protect the KEM if the public sparse code witness is decoded. Once Prange recovers the witness, an attacker can:
+
+1. decrypt every encrypted seed bit;
+2. reconstruct the encapsulated seed;
+3. verify the public confirmation tag; and
+4. derive the exact 32-byte session key.
+
+No LNAT secret-seed recovery is required.
+
+Regression: `attacks/code_kem_public_decapsulation.py` and `tests/test_code_kem_attacks.py`.
+
+This negative result is intentional: the full KEM harness is useful for measuring correctness, size, transforms, and attacks, but it inherits the random-code decoding security boundary exactly as documented.
