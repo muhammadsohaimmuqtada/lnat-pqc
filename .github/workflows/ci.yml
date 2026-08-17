@@ -22,6 +22,20 @@ jobs:
         run: python -m pip install -e ".[pqc]"
       - name: Unit and integration tests
         run: python -m unittest discover -s tests -v
+      - name: Installed CLI self-test
+        run: lnat-pqc selftest
+      - name: Real CLI file round-trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          lnat-pqc keygen --public-out "$work/public.lnat" --private-out "$work/private.lnat"
+          lnat-pqc encap --public "$work/public.lnat" --ciphertext-out "$work/ciphertext.lnat" --key-out "$work/sender.key"
+          lnat-pqc decap --public "$work/public.lnat" --private "$work/private.lnat" --ciphertext "$work/ciphertext.lnat" --key-out "$work/receiver.key"
+          cmp "$work/sender.key" "$work/receiver.key"
+          test "$(stat -c '%a' "$work/private.lnat")" = "600"
+          test "$(stat -c '%a' "$work/sender.key")" = "600"
+          test "$(stat -c '%a' "$work/receiver.key")" = "600"
       - name: Reproduce archived KEM-v1 break
         run: python attacks/public_recovery_v1.py
       - name: Recover 8-bit toy seed
@@ -31,4 +45,4 @@ jobs:
       - name: Operational hybrid smoke test
         run: python src/lnat_hybrid_kem.py
       - name: Compile
-        run: python -m compileall -q src tests attacks benchmarks
+        run: python -m compileall -q src tests attacks benchmarks experiments

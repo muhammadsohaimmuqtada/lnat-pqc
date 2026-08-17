@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lnat-pqc-research"
-version = "0.3.0a0"
+version = "0.3.1a0"
 description = "LNAT experimental primitive, cryptanalysis harness, and ML-KEM hybrid research profile"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,6 +15,9 @@ dependencies = []
 pqc = ["cryptography>=47.0.0,<50"]
 dev = ["cryptography>=47.0.0,<50"]
 
+[project.scripts]
+lnat-pqc = "lnat_cli:main"
+
 [tool.setuptools]
 py-modules = [
   "lnat_core",
@@ -22,5 +25,6 @@ py-modules = [
   "lnat_kem",
   "lnat_hybrid_kem",
   "lnat_analysis",
+  "lnat_cli",
 ]
 package-dir = { "" = "src" }

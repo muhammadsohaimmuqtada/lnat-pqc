@@ -53,14 +53,37 @@ cd lnat-pqc
 python -m pip install -e .
 ```
 
-Operational ML-KEM hybrid:
+Operational ML-KEM hybrid and CLI:
 
 ```bash
 python -m pip install -e ".[pqc]"
-python src/lnat_hybrid_kem.py
+lnat-pqc selftest
 ```
 
 The ML-KEM Python backend requires `cryptography>=47`.
+
+### End-to-end CLI
+
+```bash
+lnat-pqc keygen \
+  --public-out public.lnat \
+  --private-out private.lnat
+
+lnat-pqc encap \
+  --public public.lnat \
+  --ciphertext-out ciphertext.lnat \
+  --key-out sender.key
+
+lnat-pqc decap \
+  --public public.lnat \
+  --private private.lnat \
+  --ciphertext ciphertext.lnat \
+  --key-out receiver.key
+
+cmp sender.key receiver.key
+```
+
+The CLI does not print shared keys by default. Private keys and derived shared-key files are written with mode `0600` on POSIX systems, outputs are written atomically, and existing files are not overwritten unless `--force` is supplied.
 
 ## Tests and attacks
 
@@ -73,7 +96,7 @@ python attacks/markov_predictor.py --train 64 --test 32 -k 4
 python benchmarks/bench.py --rounds 10 --hybrid
 ```
 
-CI runs Python 3.11, 3.12, and 3.13, installs the real ML-KEM backend, runs unit/integration tests, reproduces the archived KEM-v1 break, performs toy seed recovery, runs a statistical smoke probe, and exercises the operational hybrid.
+CI runs Python 3.11, 3.12, and 3.13, installs the real ML-KEM backend, runs unit/integration tests, runs the CLI self-test, reproduces the archived KEM-v1 break, performs toy seed recovery, runs a statistical smoke probe, and exercises the operational hybrid.
 
 ## Attack-first research
 
@@ -98,6 +121,7 @@ lnat-pqc/
 │   ├── lnat_params.py
 │   ├── lnat_analysis.py
 │   ├── lnat_hybrid_kem.py
+│   ├── lnat_cli.py
 │   └── lnat_kem.py
 ├── attacks/
 │   ├── public_recovery_v1.py
@@ -123,6 +147,7 @@ Completed:
 - [x] statistical/prediction probes
 - [x] operational ML-KEM-768 hybrid KeyGen/Encap/Decap
 - [x] versioned serialization and context binding
+- [x] operational CLI with protected key-file handling
 - [x] Python 3.11–3.13 CI
 
 Open standalone-LNAT research:
