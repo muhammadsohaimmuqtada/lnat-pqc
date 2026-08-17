@@ -1,17 +1,8 @@
 """Toy Alekhnovich-style code-based public-key encryption reference.
 
 This module is a research comparator, not a production cryptosystem and not a
-security claim for LNAT.  It implements the public-key asymmetry pattern used
-by Alekhnovich's random-code encryption construction:
-
-* public key: a random binary linear code C and one noisy codeword c + e;
-* secret key: the sparse error e;
-* Enc(0): a random word from span(C, c + e)^perp plus a fresh sparse error;
-* Enc(1): a uniform word;
-* Dec: inner-product ciphertext words with e and distinguish biased-vs-uniform.
-
-The implementation deliberately uses tiny/simple parameters and repetition so
-that the mechanism, correctness failures, and attacks can be studied directly.
+security claim for LNAT. It implements the public-key asymmetry pattern used
+by Alekhnovich's random-code encryption construction.
 """
 
 from __future__ import annotations
@@ -34,6 +25,35 @@ def parity(value: int) -> int:
 
 def inner_product(left: int, right: int) -> int:
     return parity(left & right)
+
+
+class _GF2RankBasis:
+    """Incremental triangular basis used only for rank/independence checks."""
+
+    def __init__(self, n: int) -> None:
+        if n <= 0:
+            raise ValueError("n must be positive")
+        self.n = n
+        self.mask = (1 << n) - 1
+        self._rows_by_pivot: dict[int, int] = {}
+
+    @property
+    def rank(self) -> int:
+        return len(self._rows_by_pivot)
+
+    def add(self, row: int) -> bool:
+        """Insert ``row`` and return True exactly when it raises the rank."""
+        if not isinstance(row, int) or row < 0 or row > self.mask:
+            raise ValueError("row is outside the vector space")
+        value = row
+        while value:
+            pivot = value.bit_length() - 1
+            reducer = self._rows_by_pivot.get(pivot)
+            if reducer is None:
+                self._rows_by_pivot[pivot] = value
+                return True
+            value ^= reducer
+        return False
 
 
 def gf2_rref(rows: Iterable[int], n: int) -> tuple[tuple[int, ...], tuple[int, ...]]:
@@ -71,7 +91,11 @@ def gf2_rref(rows: Iterable[int], n: int) -> tuple[tuple[int, ...], tuple[int, .
 
 
 def gf2_rank(rows: Iterable[int], n: int) -> int:
-    return len(gf2_rref(rows, n)[1])
+    """Return GF(2) row rank without constructing full reduced echelon form."""
+    basis = _GF2RankBasis(n)
+    for row in rows:
+        basis.add(row)
+    return basis.rank
 
 
 def nullspace_basis(rows: Iterable[int], n: int) -> tuple[int, ...]:
@@ -116,19 +140,21 @@ def random_linear_combination(rows: Iterable[int], *, rng: BitRNG | None = None)
 
 
 def random_full_rank_code(n: int, k: int, *, rng: BitRNG | None = None) -> tuple[int, ...]:
+    """Generate k independent rows using an incremental GF(2) basis.
+
+    The old implementation recomputed the rank of every accumulated prefix for
+    each candidate. The incremental basis performs the same independence test
+    while preserving the accepted-row sequence for a fixed RNG stream.
+    """
     if not 0 < k < n:
         raise ValueError("require 0 < k < n")
     source = _rng(rng)
     rows: list[int] = []
-    rank = 0
-    while rank < k:
+    basis = _GF2RankBasis(n)
+    while basis.rank < k:
         candidate = source.getrandbits(n)
-        if candidate == 0:
-            continue
-        new_rank = gf2_rank((*rows, candidate), n)
-        if new_rank > rank:
+        if candidate and basis.add(candidate):
             rows.append(candidate)
-            rank = new_rank
     return tuple(rows)
 
 
