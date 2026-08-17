@@ -9,7 +9,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from code_attacks import recover_sparse_error_from_public_key
+from code_attacks import (
+    prange_expected_information_sets,
+    prange_expected_trial_bits,
+    recover_sparse_error_from_public_key,
+    recover_sparse_error_prange,
+)
 from code_pke_reference import CodePKEParams, CodePKESecretKey, decrypt_bit
 from lnat_code_bridge import (
     LNATCodeBridgeParams,
@@ -43,29 +48,51 @@ def main() -> int:
     pk, sk = keygen(params, rng=random.Random(81001))
     legitimate = recover_code_secret(sk, pk)
 
-    # Everything below the recovery call uses public information only.
-    recovery = recover_sparse_error_from_public_key(pk.code_key)
-    attacker_secret = CodePKESecretKey(recovery.witness, params.code)
+    # Both recovery paths below use only the public random-code instance.
+    enumeration = recover_sparse_error_from_public_key(pk.code_key)
+    prange = recover_sparse_error_prange(
+        pk.code_key,
+        rng=random.Random(83000),
+        max_subsets=512,
+    )
 
+    attacker_secret = CodePKESecretKey(prange.witness, params.code)
     ct0 = encrypt_bit(pk, 0, rng=random.Random(82000))
     ct1 = encrypt_bit(pk, 1, rng=random.Random(82001))
     recovered0 = decrypt_bit(attacker_secret, ct0)
     recovered1 = decrypt_bit(attacker_secret, ct1)
 
-    exact = recovery.witness == legitimate.error
-    success = exact and recovered0 == 0 and recovered1 == 1
+    enumeration_exact = enumeration.witness == legitimate.error
+    prange_exact = prange.witness == legitimate.error
+    success = enumeration_exact and prange_exact and recovered0 == 0 and recovered1 == 1
 
-    print("attack=public sparse-witness enumeration")
+    expected_trials = prange_expected_information_sets(
+        params.code.n,
+        params.code.k,
+        params.code.secret_weight,
+    )
+    expected_trial_bits = prange_expected_trial_bits(
+        params.code.n,
+        params.code.k,
+        params.code.secret_weight,
+    )
+
+    print("attack=public decoding of toy LNAT code bridge")
     print(f"lnat-seed-bits={params.lnat.seed_size * 8}")
     print(f"witness-space-bits={params.witness_space_bits:.6f}")
-    print(f"total-candidates={recovery.total_candidates}")
-    print(f"candidates-tested={recovery.candidates_tested}")
-    print(f"search-fraction={recovery.search_fraction:.6f}")
-    print(f"exact-witness-recovered={exact}")
+    print(f"enumeration-total-candidates={enumeration.total_candidates}")
+    print(f"enumeration-candidates-tested={enumeration.candidates_tested}")
+    print(f"enumeration-search-fraction={enumeration.search_fraction:.6f}")
+    print(f"prange-expected-information-sets={expected_trials:.6f}")
+    print(f"prange-expected-trial-bits={expected_trial_bits:.6f}")
+    print(f"prange-subsets-sampled={prange.subsets_sampled}")
+    print(f"prange-invertible-subsets={prange.invertible_subsets}")
+    print(f"enumeration-exact-witness={enumeration_exact}")
+    print(f"prange-exact-witness={prange_exact}")
     print(f"decrypt-bit0={recovered0}")
     print(f"decrypt-bit1={recovered1}")
     print(f"attack-success={success}")
-    print("interpretation=toy bridge is bounded by sparse-code witness space, not LNAT seed length")
+    print("interpretation=Prange-style decoding is a stronger public attack baseline than full witness enumeration")
     return 0 if success else 1
 
 

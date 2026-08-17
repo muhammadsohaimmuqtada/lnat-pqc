@@ -1,16 +1,15 @@
-"""Correctness and trivial-search audits for code-based research profiles.
+"""Correctness and public-attack audits for code-based research profiles.
 
-This module does not estimate full cryptanalytic security.  It provides two
-hard lower-quality gates that are still useful:
+This module does not estimate full cryptanalytic security. It reports necessary
+checks only:
 
-1. the public sparse witness can always be enumerated in at most C(n,w)
-   candidates, so log2(C(n,w)) is a ceiling on security against that trivial
-   attack; and
-2. the toy Alekhnovich-style decryption rule has an exactly computable
-   correctness distribution under its stated fixed-weight error model.
+1. full sparse-witness enumeration size C(n,w);
+2. a Prange information-set decoding iteration model, which can be far cheaper;
+3. exact decryption-failure probabilities under the reference fixed-weight
+   correctness model.
 
-Stronger attacks such as information-set decoding can only make the security
-picture worse; passing this audit is therefore necessary, never sufficient.
+Passing these checks is necessary, never sufficient. More advanced decoding
+attacks and the polynomial cost inside each iteration still need separate work.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from code_attacks import prange_expected_information_sets, prange_expected_trial_bits
 from code_pke_reference import CodePKEParams
 
 
@@ -26,6 +26,8 @@ class CodeProfileAudit:
     params: CodePKEParams
     witness_space_size: int
     trivial_enumeration_bits: float
+    prange_expected_information_sets: float
+    prange_expected_trial_bits: float
     zero_inner_product_one_probability: float
     decision_cutoff_ones: int
     bit0_failure_probability: float
@@ -39,6 +41,12 @@ class CodeProfileAudit:
         if bits < 0:
             raise ValueError("bits must be non-negative")
         return self.trivial_enumeration_bits >= bits
+
+    def meets_prange_trial_floor(self, bits: float) -> bool:
+        """Check only the logarithm of expected Prange information-set trials."""
+        if bits < 0:
+            raise ValueError("bits must be non-negative")
+        return self.prange_expected_trial_bits >= bits
 
     def meets_failure_ceiling(self, probability: float) -> bool:
         if not 0.0 <= probability <= 1.0:
@@ -114,9 +122,19 @@ def binomial_tail(trials: int, probability: float, inclusive_min: int) -> float:
 def audit_code_profile(params: CodePKEParams) -> CodeProfileAudit:
     witness_size = sparse_witness_space_size(params.n, params.secret_weight)
     witness_bits = sparse_witness_enumeration_bits(params.n, params.secret_weight)
+    prange_sets = prange_expected_information_sets(
+        params.n,
+        params.k,
+        params.secret_weight,
+    )
+    prange_bits = prange_expected_trial_bits(
+        params.n,
+        params.k,
+        params.secret_weight,
+    )
 
     # In Enc(0), the dual-code contribution is exactly orthogonal to the
-    # secret witness.  The only remaining inner-product bit comes from the
+    # secret witness. The only remaining inner-product bit comes from the
     # intersection parity of the secret and fresh fixed-weight error supports.
     p_zero_one = fixed_weight_intersection_odd_probability(
         params.n,
@@ -133,6 +151,8 @@ def audit_code_profile(params: CodePKEParams) -> CodeProfileAudit:
         params=params,
         witness_space_size=witness_size,
         trivial_enumeration_bits=witness_bits,
+        prange_expected_information_sets=prange_sets,
+        prange_expected_trial_bits=prange_bits,
         zero_inner_product_one_probability=p_zero_one,
         decision_cutoff_ones=cutoff,
         bit0_failure_probability=bit0_failure,
