@@ -58,6 +58,8 @@ jobs:
         run: python experiments/code_channel_audit.py --n 256 --k 128 --secret-weight 30 --error-weight 1 --repetitions 233 --cutoff 66 --message-bits 128 --tag-bytes 16
       - name: Multi-bit outer-code packing probe
         run: python experiments/outer_code_probe.py --trials 16 --channel-uses 128
+      - name: Finite-blocklength outer-code sweep
+        run: python experiments/outer_code_sweep.py --message-bits 8 --lengths 48,64,80,96,112,128 --trials 32 --q 0.03125
       - name: Full LNAT code KEM research round-trip
         run: python experiments/lnat_code_kem_probe.py --trials 4
       - name: Public break of toy LNAT code KEM
