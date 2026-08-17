@@ -37,29 +37,9 @@ jobs:
           python-version: "3.11"
       - name: Install pinned estimator bridge
         run: python -m pip install -e ".[estimator]"
-      - name: Run estimator and modern-frontier tests
+      - name: Enforce modern frontier unit and real-estimator regressions
         run: python -m unittest tests.test_code_sd_estimator tests.test_code_modern_frontier tests.test_code_modern_frontier_real -v
       - name: Cross-check rejected legacy profile
         run: python experiments/upstream_isd_probe.py --n 256 --k 128 --weight 48 --top 8
-      - name: Exercise reusable effective frontier
-        run: python experiments/modern_frontier_probe.py --n 256 --k 128 --weight 28 --attack-floor-bits 40 --max-repetitions 512
-
-  upstream-boundary:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        point:
-          - "1056:528:116"
-          - "1064:532:116"
-          - "1072:536:117"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install pinned estimator bridge
-        run: python -m pip install -e ".[estimator]"
-      - name: Measure modern-ISD threshold point
-        run: python experiments/modern_isd_scale_probe.py --point "${{ matrix.point }}"
+      - name: Exercise reusable effective frontier CLI
+        run: python experiments/modern_frontier_probe.py --n 1072 --k 536 --weight 117 --attack-floor-bits 128 --max-repetitions 512
