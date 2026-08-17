@@ -1,23 +1,18 @@
 """Experimental parameter profiles for LNAT research.
 
-The names in this module describe state-size profiles only. They are not
-claims of classical, quantum, or NIST security strength.
+Profile names describe engineering dimensions only. They are not claims of
+classical, quantum, NIST, IND-CPA, or IND-CCA security strength.
 """
 
 from dataclasses import dataclass
 
-SCHEME_VERSION = "LNAT-EXP1"
+SCHEME_VERSION = "LNAT-EXP2"
 IMPLEMENTED_REPETITION_FACTOR = 7
 
 
 @dataclass(frozen=True)
 class LNATParams:
-    """Parameters for an LNAT experiment profile.
-
-    `n`, `m`, and `T` are engineering/research parameters. `kappa` is the
-    message width used by the archived KEM-v1 experiment. None of these
-    values should be interpreted as a proven security level.
-    """
+    """Parameters for an LNAT experiment profile."""
 
     name: str
     n: int
@@ -41,54 +36,31 @@ class LNATParams:
         if self.seed_size <= 0:
             raise ValueError("seed_size must be positive")
         if self.kappa is None:
-            object.__setattr__(self, "kappa", self.n // 2)
+            object.__setattr__(self, "kappa", max(1, self.n // 2))
         if self.kappa <= 0:
             raise ValueError("kappa must be positive")
 
     @property
     def domain_id(self) -> bytes:
-        """Stable identifier used for domain separation."""
         return f"{SCHEME_VERSION}|{self.name}".encode("ascii")
 
     def public_trace_size_bytes(self) -> int:
-        """Size of the current public trace serialization used by KEM-v1."""
         return 32 + 16 + 4 + (self.T + 7) // 8
 
     def private_seed_size_bytes(self) -> int:
         return self.seed_size
 
     def broken_kem_v1_ciphertext_size_bytes(self) -> int:
-        """Ciphertext size of the archived, insecure KEM-v1 experiment."""
         return (IMPLEMENTED_REPETITION_FACTOR * self.kappa + 7) // 8
 
 
-LNAT128 = LNATParams(
-    name="LNAT-n128-exp1",
-    n=128,
-    m=8,
-    T=512,
-    eta=0.05,
-)
-
-LNAT192 = LNATParams(
-    name="LNAT-n192-exp1",
-    n=192,
-    m=8,
-    T=768,
-    eta=0.05,
-)
-
-LNAT256 = LNATParams(
-    name="LNAT-n256-exp1",
-    n=256,
-    m=16,
-    T=1024,
-    eta=0.05,
-)
+LNAT128 = LNATParams("LNAT-n128-exp2", n=128, m=8, T=512, eta=0.05)
+LNAT192 = LNATParams("LNAT-n192-exp2", n=192, m=8, T=768, eta=0.05)
+LNAT256 = LNATParams("LNAT-n256-exp2", n=256, m=16, T=1024, eta=0.05)
 
 DEFAULT_PARAMS = LNAT128
-ALL_PARAMS = {
-    LNAT128.name: LNAT128,
-    LNAT192.name: LNAT192,
-    LNAT256.name: LNAT256,
-}
+ALL_PARAMS = {p.name: p for p in (LNAT128, LNAT192, LNAT256)}
+
+# Deliberately tiny profiles for attack experiments only.
+TOY8 = LNATParams("LNAT-toy8-exp2", n=8, m=2, T=32, eta=0.05, kappa=4, seed_size=1)
+TOY16 = LNATParams("LNAT-toy16-exp2", n=16, m=3, T=48, eta=0.05, kappa=8, seed_size=2)

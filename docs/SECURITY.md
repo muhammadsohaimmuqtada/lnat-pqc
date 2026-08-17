@@ -1,56 +1,47 @@
 # LNAT Security Status
 
-## Current position
+## Current status
 
-LNAT-EXP1 is an experimental learning/cryptanalysis target. **No cryptographic security level is claimed.** The archived KEM-v1 is completely broken by public recovery and must not be used.
+There are two live objects and one archived failure:
 
-The goal of this repository is now to produce falsifiable definitions, attacks, measurements, and negative results before proposing another cryptographic construction.
+1. **LNAT-EXP2** — standalone experimental noisy-automaton primitive under active cryptanalysis. No public-key or post-quantum security level is claimed.
+2. **LNAT-MLKEM768-HYBRID-v1** — operational research KEM integration whose public-key security boundary is ML-KEM-768; LNAT is deterministic post-processing.
+3. **LNAT KEM-v1** — broken and retained as a reproducible negative result.
 
-## What is actually implemented
+## Why KEM-v1 failed
 
-The secret transition function is generated from a fixed-size seed using domain-separated HMAC-SHA256. The public observation at time `t` is the least-significant bit of the post-transition state, optionally flipped by independent Bernoulli noise.
+KEM-v1 XORed an encoded random secret with `pk.Y`. Because `pk.Y` was public, an observer could perform the same XOR, decode the secret, and compute the session key. No automaton inversion was needed.
 
-This means security analysis must study the implemented seed-derived transition family and trace distribution. Arguments based only on the storage size or count of arbitrary finite-state transition tables are insufficient.
+`attacks/public_recovery_v1.py` must continue to reproduce this break in CI.
 
-## KEM-v1 status
+## EXP2 design correction
 
-KEM-v1 is not IND-CPA secure. Its mask is the public `pk.Y`, so the encapsulated value is directly recoverable from public information. The repository contains a regression test and standalone attack that reproduce this break.
+EXP1 published `LSB(q_t)`, a fixed state coordinate. EXP2 uses a keyed, step-separated observation bit derived through HMAC-SHA256. This removes that specific coordinate projection but does not establish hardness.
 
-No Fujisaki-Okamoto transform or CCA wrapper can repair a base construction whose encapsulated secret is already public-recoverable.
+## Claims deliberately not made
 
-## No parameter security mapping
+The repository does not claim standalone LNAT has:
 
-The experiment profiles `LNAT-n128-exp1`, `LNAT-n192-exp1`, and `LNAT-n256-exp1` describe state sizes. They are not estimates of 128/192/256-bit security and are not mapped to NIST levels.
+- `n` bits of classical security;
+- `n/2` bits of quantum security;
+- NIST security levels;
+- IND-CPA or IND-CCA security;
+- a reduction to LPN, LWE, MQ, or another accepted problem;
+- security from the size of a hypothetical full transition table.
 
-Any future security estimate must be supported by a defined attack game, concrete best-known attacks, parameter-dependent work factors, and independent review.
+## Required evidence before standalone KEM work
 
-## Priority attack program
+A future standalone LNAT KEM needs at minimum:
 
-The most useful near-term work is adversarial:
+1. a precise public-key trapdoor/asymmetric relation;
+2. an explicit security game;
+3. concrete attacks on small parameters;
+4. no direct public-data recovery path;
+5. parameter selection based on attack cost rather than state width alone;
+6. failure-probability analysis;
+7. malformed-ciphertext/chosen-ciphertext analysis;
+8. independent cryptanalysis.
 
-1. exhaustive seed/state recovery at deliberately tiny parameters;
-2. SAT/SMT encodings of transition and observation constraints;
-3. statistical distinguishers against clearly defined null distributions;
-4. correlation and state-prediction attacks;
-5. multi-trace attacks with reused secret seeds and varying nonces/input seeds;
-6. sample-complexity measurements;
-7. analysis of whether the LSB observation creates exploitable bias or structure;
-8. analysis of the seed-derived PRF family rather than an ideal arbitrary table.
+## Side channels
 
-## Requirements before KEM-v2
-
-A KEM-v2 proposal should not begin until there is a precise asymmetric mechanism. At minimum, the design must explain why a public-key holder can form a ciphertext/shared secret that the private-key holder can recover while an observer possessing the same public key and ciphertext cannot.
-
-Before any security claim, the repository should contain:
-
-- a complete algorithm specification;
-- explicit correctness and failure definitions;
-- a formal security game;
-- best-known attack implementations for small parameters;
-- parameter rationale derived from those attacks;
-- deterministic test vectors;
-- independent cryptanalysis or review.
-
-## Implementation hardening comes later
-
-Constant-time code, optimized PRFs, embedded implementations, BCH/other coding, and performance benchmarking remain useful engineering topics, but they do not repair a broken construction. They should follow, not precede, evidence that the cryptographic design is meaningful.
+The Python implementation is not constant-time and is not production code.

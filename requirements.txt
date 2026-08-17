@@ -1,2 +1,3 @@
-# The LNAT reference implementation currently uses only the Python standard library.
-# Install the project itself with: python -m pip install -e .
+# Full operational hybrid dependency. The core LNAT research primitive itself
+# uses only Python's standard library.
+cryptography>=47.0.0,<50

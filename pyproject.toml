@@ -4,13 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lnat-pqc-research"
-version = "0.2.0a0"
-description = "Experimental research implementation of Learning Noisy Automata Transitions"
+version = "0.3.0a0"
+description = "LNAT experimental primitive, cryptanalysis harness, and ML-KEM hybrid research profile"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = []
 
+[project.optional-dependencies]
+pqc = ["cryptography>=47.0.0,<50"]
+dev = ["cryptography>=47.0.0,<50"]
+
 [tool.setuptools]
-py-modules = ["lnat_core", "lnat_params", "lnat_kem"]
+py-modules = [
+  "lnat_core",
+  "lnat_params",
+  "lnat_kem",
+  "lnat_hybrid_kem",
+  "lnat_analysis",
+]
 package-dir = { "" = "src" }

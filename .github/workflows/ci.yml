@@ -18,11 +18,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install
-        run: python -m pip install -e .
-      - name: Unit tests
+      - name: Install operational profile
+        run: python -m pip install -e ".[pqc]"
+      - name: Unit and integration tests
         run: python -m unittest discover -s tests -v
-      - name: Reproduce known KEM-v1 break
+      - name: Reproduce archived KEM-v1 break
         run: python attacks/public_recovery_v1.py
+      - name: Recover 8-bit toy seed
+        run: python attacks/exhaustive_seed_recovery.py --seed-bits 8 --traces 3 --noise 0.05
+      - name: Statistical smoke probe
+        run: python attacks/statistical_probe.py --samples 8
+      - name: Operational hybrid smoke test
+        run: python src/lnat_hybrid_kem.py
       - name: Compile
-        run: python -m compileall -q src tests attacks
+        run: python -m compileall -q src tests attacks benchmarks

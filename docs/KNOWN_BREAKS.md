@@ -1,48 +1,31 @@
-# Known Breaks
+# Known Breaks and Negative Results
 
 ## KEM-v1: complete public recovery
 
-**Status:** complete confidentiality break.
+**Status:** complete break, reproducible.
 
-The archived KEM-v1 chose random message bits `r`, repetition-encoded them, extended the public trace `Y`, and produced:
-
-```text
-ct = Encode(r) XOR Extend(pk.Y)
-K  = H(r)
-```
-
-But `pk.Y` is public. Therefore any observer computes:
+Given public trace `Y` and ciphertext `ct`:
 
 ```text
-Encode(r) = ct XOR Extend(pk.Y)
-r         = Decode(Encode(r))
-K         = H(r)
+ct = Encode(r) XOR Extend(Y)
 ```
 
-The attack requires no private key, no state recovery, no transition-table reconstruction, and no cryptanalysis of HMAC-SHA256.
-
-A runnable reproduction is provided in:
+an observer computes:
 
 ```text
-attacks/public_recovery_v1.py
+Encode(r) = ct XOR Extend(Y)
+r = Decode(Encode(r))
+K = H(r)
 ```
 
-and the regression test is:
+The private seed is irrelevant. Regression: `attacks/public_recovery_v1.py` and `tests/test_broken_kem.py`.
 
-```text
-tests/test_broken_kem.py
-```
+## EXP1: fixed-coordinate observation
 
-This break invalidates any IND-CPA or IND-CCA claim for KEM-v1.
+EXP1 observed `LSB(q_t)` directly. That was more structured than earlier documentation implied. EXP2 replaces the fixed coordinate with a keyed observation PRF. This is a removed avoidable structure, not a proof.
 
-## Security-level claims from state size
+## Toy seed recovery
 
-Earlier versions equated state size `n` with classical security and `n/2` with quantum security. No reduction or attack analysis justified those values. These claims have been removed.
+The attack harness exactly recovers deliberately tiny seeds by exhaustive minimum-Hamming-distance search, including noisy multi-trace observations. This is expected and serves as a real attack baseline.
 
-## Full-table counting argument
-
-Earlier analysis counted the number of arbitrary transition tables. The implementation instead selects a transition function from a seed-derived PRF family. Counting all possible arbitrary tables does not establish the security of the implemented family and is no longer used as a security argument.
-
-## Failed-attacker demonstrations
-
-A previous `test_hardness.py` constructed one deliberately weak guessed-state attacker and interpreted its failure as evidence of hardness. Failure of a single toy attack is not a hardness result. That file has been removed from the test suite.
+Do not extrapolate toy exhaustive-search results into a security level for larger profiles without a justified attack model.
