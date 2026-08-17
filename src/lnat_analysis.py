@@ -6,7 +6,7 @@ import random
 from dataclasses import dataclass
 from typing import Iterable
 
-from lnat_core import LNATAutomaton, generate_input_sequence, observation_bit
+from lnat_core import LNATAutomaton, generate_input_sequence, observation_bit, prf
 from lnat_params import LNATParams
 
 
@@ -45,6 +45,28 @@ class PrunedRecoveryResult:
         if self.full_bit_comparisons == 0:
             return 0.0
         return self.saved_bit_comparisons / self.full_bit_comparisons
+
+
+@dataclass(frozen=True)
+class AvalancheResult:
+    """Effect of changing one public input symbol on later output bits."""
+
+    mutation_index: int
+    original_input: int
+    mutated_input: int
+    tail_length: int
+    lnat_mutation_bit_changed: bool
+    lnat_tail_differences: int
+    direct_mutation_bit_changed: bool
+    direct_tail_differences: int
+
+    @property
+    def lnat_tail_rate(self) -> float:
+        return self.lnat_tail_differences / self.tail_length if self.tail_length else 0.0
+
+    @property
+    def direct_tail_rate(self) -> float:
+        return self.direct_tail_differences / self.tail_length if self.tail_length else 0.0
 
 
 def hamming_distance(a: Iterable[int], b: Iterable[int]) -> int:
@@ -227,6 +249,111 @@ def exhaustive_seed_recovery_pruned(
         candidates_pruned=pruned,
         bit_comparisons=compared,
         full_bit_comparisons=tested * bits_per_candidate,
+    )
+
+
+def direct_prf_trace(
+    seed: bytes,
+    params: LNATParams,
+    *,
+    nonce: bytes,
+    seed_A: bytes,
+    inputs: Iterable[int] | None = None,
+) -> tuple[int, ...]:
+    """Direct keyed-PRF stream used as an ablation baseline.
+
+    Unlike LNAT, this baseline has no hidden state chain. Each output bit is a
+    PRF of only the public context, step, and current input symbol. A mutation
+    therefore cannot propagate into later steps.
+    """
+    if len(seed) != params.seed_size:
+        raise ValueError("seed length does not match profile")
+    if not nonce:
+        raise ValueError("nonce must be non-empty")
+    if len(seed_A) != 32:
+        raise ValueError("seed_A must be 32 bytes")
+    if inputs is None:
+        _, generated = generate_input_sequence(params, seed_A)
+        values = tuple(generated)
+    else:
+        values = tuple(inputs)
+    if len(values) != params.T:
+        raise ValueError("input sequence length does not match profile")
+
+    input_bytes = (params.m + 7) // 8
+    domain = params.domain_id + b"|DIRECT-PRF-BASELINE|"
+    out: list[int] = []
+    for step, inp in enumerate(values, start=1):
+        if not isinstance(inp, int) or not 0 <= inp < (1 << params.m):
+            raise ValueError("input is outside the parameter input alphabet")
+        message = (
+            domain
+            + nonce
+            + seed_A
+            + step.to_bytes(8, "big")
+            + inp.to_bytes(input_bytes, "big")
+        )
+        out.append(prf(seed, message, 1)[0] & 1)
+    return tuple(out)
+
+
+def input_avalanche(
+    seed: bytes,
+    params: LNATParams,
+    *,
+    nonce: bytes,
+    seed_A: bytes,
+    mutation_index: int,
+) -> AvalancheResult:
+    """Measure forward propagation after changing one public input symbol."""
+    if not 0 <= mutation_index < params.T:
+        raise ValueError("mutation_index is outside the trace")
+    _, generated = generate_input_sequence(params, seed_A)
+    original_inputs = tuple(generated)
+    mutated_inputs = list(original_inputs)
+    original = mutated_inputs[mutation_index]
+    replacement = (original + 1) % (1 << params.m)
+    mutated_inputs[mutation_index] = replacement
+
+    automaton = LNATAutomaton(seed, params)
+    q0 = automaton.derive_q0(nonce)
+    lnat_original = tuple(automaton.run_noiseless(q0, original_inputs))
+    lnat_mutated = tuple(automaton.run_noiseless(q0, mutated_inputs))
+
+    direct_original = direct_prf_trace(
+        seed,
+        params,
+        nonce=nonce,
+        seed_A=seed_A,
+        inputs=original_inputs,
+    )
+    direct_mutated = direct_prf_trace(
+        seed,
+        params,
+        nonce=nonce,
+        seed_A=seed_A,
+        inputs=mutated_inputs,
+    )
+
+    if lnat_original[:mutation_index] != lnat_mutated[:mutation_index]:
+        raise AssertionError("LNAT changed before the mutated input was consumed")
+    if direct_original[:mutation_index] != direct_mutated[:mutation_index]:
+        raise AssertionError("direct baseline changed before the mutation")
+
+    tail_start = mutation_index + 1
+    return AvalancheResult(
+        mutation_index=mutation_index,
+        original_input=original,
+        mutated_input=replacement,
+        tail_length=params.T - tail_start,
+        lnat_mutation_bit_changed=lnat_original[mutation_index] != lnat_mutated[mutation_index],
+        lnat_tail_differences=hamming_distance(
+            lnat_original[tail_start:], lnat_mutated[tail_start:]
+        ),
+        direct_mutation_bit_changed=direct_original[mutation_index] != direct_mutated[mutation_index],
+        direct_tail_differences=hamming_distance(
+            direct_original[tail_start:], direct_mutated[tail_start:]
+        ),
     )
 
 
