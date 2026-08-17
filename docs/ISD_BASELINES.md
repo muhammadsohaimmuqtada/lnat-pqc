@@ -4,10 +4,11 @@
 
 The public random-code relation used by the research bridge/KEM must be evaluated as a syndrome-decoding target. No LNAT master-seed length is used as a substitute for decoding work.
 
-The repository now has two executable information-set decoding baselines:
+The repository now has three executable information-set decoding baselines:
 
 1. **Prange-style decoding** in `src/code_attacks.py`;
-2. **Lee-Brickell-style generalized ISD** in `src/code_isd.py`.
+2. **Lee-Brickell-style generalized ISD** in `src/code_isd.py`;
+3. **Stern-style collision/list ISD** in `src/code_stern.py`.
 
 These are attack baselines, not security proofs.
 
@@ -29,42 +30,70 @@ Ignoring the probability that the selected square submatrix is invertible, the e
 C(k,p) * C(n-k,w-p) / C(n,w).
 ```
 
-The executable attack separately reports sampled information sets, invertible sets, and guesses tested.
+## Stern-style collision baseline
 
-## Cost model
+The executable Stern step keeps the same systematic-information-set setup but avoids enumerating every `2p`-subset directly.
 
-`lee_brickell_cost_point()` includes a deliberately simple implementation-cost model:
+After transforming the target and information-set columns through `H_J^-1`, split the `k` information positions into two halves `I1` and `I2`. Enumerate weight-`p` partial sums in both halves and match them on `l` selected coordinates of the transformed parity solution.
+
+A useful sampled set for this implementation has:
+
+- exactly `p` errors in `I1`;
+- exactly `p` errors in `I2`;
+- zero errors in the `l` collision-filter parity coordinates;
+- the remaining `w-2p` errors in the other `r-l` parity coordinates.
+
+Ignoring invertibility of `H_J`, the modeled event probability is:
 
 ```text
-elimination cost per sampled set ~= (n-k)^3
-per-guess work                  ~= (p+2)(n-k)
+C(|I1|,p) * C(|I2|,p) * C(r-l,w-2p) / C(n,w).
 ```
 
-and combines this with the expected information-set count.
+The left list has `C(|I1|,p)` entries, the right list has `C(|I2|,p)` entries, and the expected number of projection collisions under the random-code heuristic is modeled as:
 
-This is useful for choosing `p` in the reference Python implementation. It is **not** a modern ISD security estimator and the resulting `log2(operations)` must not be presented as a proven security level.
+```text
+C(|I1|,p) * C(|I2|,p) / 2^l.
+```
 
-## Why this is an intermediate step
+The reduced-parameter implementation validates the mechanism by recovering the exact public sparse witness, rather than adding an estimator that has never been exercised.
 
-Stern/Dumer-style collision methods and later ISD algorithms reduce decoding work further by using meet-in-the-middle/list techniques. Before adding those formulas to the parameter frontier, this repository requires either:
+## Cost models
 
-- an executable reduced-parameter attack matching the modeled mechanism; or
-- a carefully sourced estimator whose list sizes, success probability, memory cost, and operation model are explicit.
+`lee_brickell_cost_point()` uses:
 
-The project will not replace Prange with an unverified single-number formula.
+```text
+elimination cost per sampled set ~= r^3
+per-guess work                  ~= (p+2)r
+```
+
+`stern_cost_point()` separately reports:
+
+```text
+elimination work ~= r^3
+list work        ~= (L1 + L2) * p * r
+collision work   ~= (L1 * L2 / 2^l) * r
+memory entries   ~= L1
+```
+
+where `L1=C(|I1|,p)` and `L2=C(|I2|,p)`.
+
+These counts are intentionally simple Python/reference-operation models. They omit optimized bit-slicing, Gray-code/list-update techniques, the probability that `H_J` is invertible, and later ISD improvements. Their `log2(operations)` values are for relative research screening only and must not be presented as a proven security level.
+
+## Why this is still intermediate
+
+Stern-style collisions are stronger than the current Prange/Lee-Brickell baselines, but Dumer and later BJMM/MMT-style algorithms can reduce work further. The next estimator should therefore retain explicit list sizes, collision conditions, memory, success probability, and an executable reduced-parameter validation whenever feasible.
 
 ## Primary literature direction
 
-The relevant progression includes:
+- Lee and Brickell, *An Observation on the Security of McEliece's Public-Key Cryptosystem*.
+- Jacques Stern, *A Method for Finding Codewords of Small Weight*, 1989.
+- Christiane Peters, *Information-Set Decoding for Linear Codes over F_q*, IACR ePrint 2009/589 / PQCrypto 2010.
 
-- Lee and Brickell, *An Observation on the Security of McEliece's Public-Key Cryptosystem*;
-- Stern, *A Method for Finding Codewords of Small Weight*;
-- Peters, *Information-Set Decoding for Linear Codes over F_q*.
-
-These references motivate increasingly strong ISD families. The repository's own claims remain limited to what its executable attacks and explicit cost models actually implement.
+The repository's claims remain limited to the mechanisms and cost accounting actually implemented here.
 
 ## Run
 
 ```bash
 python experiments/lee_brickell_probe.py
+python experiments/stern_probe.py
 ```
