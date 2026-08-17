@@ -63,10 +63,10 @@ Prange expected-trial bits                256.050133924
 idealized Grover iteration bits            127.676563092
 width-optimized logical qubits             721,643
 depth-oriented full logical qubits         1,438,205
-Table-2 width-optimized depth-scale bits   163.278287166
+Table-2 width-optimized depth-scale bits   163.626791037
 ```
 
-The qubit counts are closed-form logical-qubit counts from the paper. The depth-scale value is **not** an exact gate depth: Table 2 states it using big-O notation, so multiplicative constants and concrete gate decomposition costs are hidden. The qISD supplementary simulator is intended for small circuits and is not treated as a way to simulate a 700k-qubit attack.
+The qubit counts are closed-form logical-qubit counts from the paper. The depth-scale value keeps Table 2's `n^3 log(n)/sqrt(q)` expression literal and is **not** an exact gate depth: Table 2 states it using big-O notation, so multiplicative constants and concrete gate decomposition costs are hidden. The separate `pi/4` amplitude-amplification constant is used only in the idealized iteration estimate, not injected into the big-O depth scale. The qISD supplementary simulator is intended for small circuits and is not treated as a way to simulate a 700k-qubit attack.
 
 These resource figures strengthen the accounting around the current Prange attack, but they do not rescue the parameter point or establish a PQ security level. Stronger quantum ISD algorithms remain outside the finite model.
 
