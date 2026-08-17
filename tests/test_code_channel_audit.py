@@ -36,6 +36,12 @@ class CodeChannelAuditTests(unittest.TestCase):
         self.assertAlmostEqual(channel.optimal_input_one_probability, 0.4668352729725102)
         self.assertAlmostEqual(channel.output_one_probability_at_capacity, 0.29589787793478906)
 
+    def test_toy_outer_channel_capacity_regression(self):
+        # secret weight 2, fresh error weight 1, n=64 -> q=2/64=1/32.
+        channel = code_bit_channel_capacity(1 / 32)
+        self.assertAlmostEqual(channel.capacity_bits_per_use, 0.23854135781873376)
+        self.assertGreater(channel.capacity_bits_per_use, 8 / 48)
+
     def test_capacity_lower_bound_for_128_bit_seed(self):
         channel = code_bit_channel_capacity(30 / 256)
         self.assertEqual(
