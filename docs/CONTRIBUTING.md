@@ -1,49 +1,43 @@
-# Contributing to LNAT-PQC
+# Contributing to LNAT-PQC Research
 
-LNAT is early-stage experimental cryptography. The highest-value contributions are reproducible attacks, counterexamples, precise definitions, and independent implementations.
+The highest-value contribution is evidence: attacks, counterexamples, independent implementations, reproducible measurements, and specification corrections.
 
-## Cryptanalysis
+## Before changing the construction
 
-A useful cryptanalysis report should include:
+Algorithm changes must answer:
 
-- the exact commit and parameter profile;
-- the attack model and information available to the attacker;
-- runnable code or sufficiently precise pseudocode;
-- measured success rate and work factor;
-- whether the result is a full break, distinguisher, recovery attack, bias, or negative result.
+1. What exact weakness or research question does the change address?
+2. Does the mathematical specification change?
+3. Does domain separation/versioning need to change?
+4. Which known-answer vectors change?
+5. Which attack should be rerun?
+6. Does the change create a new security claim? If so, what proof or evidence supports it?
 
-A failed attack is useful when its model and limitations are documented, but failure of one attack must not be described as proof of hardness.
-
-## Algorithm changes
-
-Changes to the primitive or a future KEM should include:
-
-- an updated specification;
-- new correctness tests;
-- an explicit threat model;
-- adversarial regression tests where applicable;
-- documentation of which previous results/test vectors become invalid.
-
-Do not add security-level or NIST-level claims without a defensible cryptanalytic basis and review.
-
-## Running checks
+## Required checks
 
 ```bash
 python -m unittest discover -s tests -v
 python attacks/public_recovery_v1.py
-python -m compileall -q src tests attacks
+python attacks/exhaustive_seed_recovery.py --seed-bits 8 --traces 3 --noise 0.05
+python attacks/statistical_probe.py --samples 8
+python -m compileall -q src tests attacks benchmarks experiments
 ```
 
-The public-recovery attack is expected to succeed because it documents the archived KEM-v1 break.
+With the PQC extra installed:
 
-## Code style
+```bash
+python src/lnat_hybrid_kem.py
+python benchmarks/bench.py --rounds 5 --hybrid
+```
 
-- Prefer clear reference code over premature optimization.
-- Use explicit exceptions rather than `assert` for input validation.
-- Use `secrets` for cryptographic randomness in reference code.
-- Domain-separate cryptographic function invocations.
-- Document security rationale and uncertainty explicitly.
+## Cryptanalysis reports
 
-## Responsible framing
+Include commit SHA, exact profile, sample count, attacker knowledge, success criterion, runtime/memory, reproduction commands, and whether the result is a full break, distinguisher, predictor, recovery attack, or observation.
 
-Do not present LNAT as production-ready, standardized, peer-reviewed, or equivalent in security to standardized post-quantum algorithms. The repository is intended to make the research easy to inspect and challenge.
+Failed attacks are useful when methodology and limits are documented.
+
+## Security language
+
+Do not describe state size as security bits. Do not assign NIST levels to standalone LNAT. Do not describe a passing statistical test as evidence of cryptographic pseudorandomness.
+
+The operational hybrid may accurately state that it uses ML-KEM-768 as its KEM backend, but must not imply that LNAT independently provides the standardized security property.

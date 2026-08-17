@@ -1,5 +1,15 @@
 # Paper status
 
-`LNAT_Research_Paper.docx` predates the cryptanalytic reset that documented the complete KEM-v1 public-recovery break and removed unsupported security-level claims.
+`LNAT_Research_Paper.docx` is historical material from before the KEM-v1 break was formally incorporated into the repository and before LNAT-EXP2.
 
-The document is retained as historical research material. It is not authoritative for the current algorithm specification or security status. Any future paper revision should be based on `docs/SPECIFICATION.md`, `docs/SECURITY.md`, and `docs/KNOWN_BREAKS.md`.
+It is **not authoritative** for the current construction or security status.
+
+Use instead:
+
+- `docs/SPECIFICATION.md`
+- `docs/HYBRID_KEM.md`
+- `docs/GAMES.md`
+- `docs/SECURITY.md`
+- `docs/KNOWN_BREAKS.md`
+
+A future paper revision should include the KEM-v1 break as a negative result rather than silently replacing it.

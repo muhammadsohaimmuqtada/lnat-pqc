@@ -1,113 +1,143 @@
-# LNAT-PQC
+# LNAT-PQC Research
 
-**Learning Noisy Automata Transitions — experimental cryptography research**
+**Learning Noisy Automata Transitions — experimental primitive, cryptanalysis harness, and operational ML-KEM integration**
 
-LNAT studies whether a secret, seed-derived finite-state transition process observed through noisy traces yields a useful computational learning problem.
+LNAT studies secret-seeded noisy state-transition processes as a cryptographic research object. The repository separates three things that must not be confused:
 
-> **Security status:** no cryptographic security is claimed. The original KEM-v1 construction is publicly broken and is retained only as a reproducible negative result. Do not use this repository to protect real data.
+| Component | Status | Purpose |
+|---|---|---|
+| `LNAT-EXP2` | experimental | standalone noisy-automaton primitive for analysis |
+| archived `LNAT KEM-v1` | **broken** | reproducible negative result |
+| `LNAT-MLKEM768-HYBRID-v1` | operational research profile | complete PQC-backed KeyGen/Encap/Decap integration |
 
-## Research reset
+> **Security boundary:** standalone LNAT has no established security level. The operational hybrid uses ML-KEM-768 for public-key encapsulation and keeps the ML-KEM shared secret as a direct input to the final SHAKE256 extraction. LNAT is additional deterministic post-processing, not an independently proven source of post-quantum security.
 
-The project has been reset to a defensible starting point:
+## LNAT-EXP2
 
-- the LNAT primitive is specified independently of any KEM claim;
-- parameter names describe experiment sizes, not security levels;
-- the KEM-v1 confidentiality break is documented and tested;
-- the historical KEM cannot be instantiated without an explicit `allow_broken=True` acknowledgement;
-- tests separate implementation correctness from cryptanalytic evidence;
-- security documentation does not claim NIST levels, IND-CPA, IND-CCA, or post-quantum strength.
-
-## Primitive under study
-
-For profile parameters `(n, m, T, eta)` and a secret seed `s`, LNAT-EXP1 uses:
+EXP1 exposed the least-significant bit of every hidden state. EXP2 instead defines:
 
 ```text
 q_0 = Q0_s(nonce)
 q_t = Delta_s(q_{t-1}, a_t)
-z_t = LSB(q_t)
-y_t = z_t XOR e_t,   e_t ~ Bernoulli(eta)
+z_t = LSB(PRF_s(D_OBS || t || q_t))
+y_t = z_t XOR e_t
 ```
 
-`Delta_s` and `Q0_s` are instantiated with domain-separated HMAC-SHA256 in the reference code. The public trace is generated from a public input-sequence seed and a public nonce.
+`Q0`, `DELTA`, `OBS`, and input expansion are domain-separated. This removes an avoidable fixed-coordinate observation; it is **not** a security proof.
 
-This is a **research object**, not an accepted hardness assumption. See [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
+See [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md).
 
-## Known break of KEM-v1
+## Operational hybrid
 
-The archived KEM-v1 formed its ciphertext by XORing an encoded secret with `pk.Y`. Because `pk.Y` is public, anyone can remove the same mask and recover the encapsulated secret. No recovery of the automaton state or transition function is required.
+```python
+from lnat_hybrid_kem import LNATMLKEM768
 
-See [`docs/KNOWN_BREAKS.md`](docs/KNOWN_BREAKS.md) and [`attacks/public_recovery_v1.py`](attacks/public_recovery_v1.py).
-
-## Repository structure
-
-```text
-lnat-pqc/
-├── src/
-│   ├── lnat_core.py          # LNAT-EXP1 primitive
-│   ├── lnat_params.py        # experimental parameter profiles
-│   └── lnat_kem.py           # archived BROKEN KEM-v1
-├── tests/
-│   ├── test_core.py
-│   └── test_broken_kem.py
-├── attacks/
-│   └── public_recovery_v1.py
-├── experiments/
-│   └── README.md
-├── docs/
-│   ├── SPECIFICATION.md
-│   ├── SECURITY.md
-│   ├── KNOWN_BREAKS.md
-│   ├── RESEARCH_ROADMAP.md
-│   └── CONTRIBUTING.md
-├── paper/
-│   ├── LNAT_Research_Paper.docx
-│   └── README.md
-├── pyproject.toml
-└── README.md
+kem = LNATMLKEM768()
+pk, sk = kem.keygen()
+ct, sender_key = kem.encap(pk)
+receiver_key = kem.decap(sk, pk, ct)
+assert sender_key == receiver_key
 ```
 
-## Run the reference checks
+The hybrid uses ML-KEM-768 to establish the secret, deterministically derives an LNAT-EXP2 transcript from that secret and public context, then derives the final 32-byte key from **both** the ML-KEM secret and the LNAT transcript.
+
+See [`docs/HYBRID_KEM.md`](docs/HYBRID_KEM.md).
+
+## Install
+
+Core research primitive:
+
+```bash
+git clone https://github.com/muhammadsohaimmuqtada/lnat-pqc.git
+cd lnat-pqc
+python -m pip install -e .
+```
+
+Operational ML-KEM hybrid:
+
+```bash
+python -m pip install -e ".[pqc]"
+python src/lnat_hybrid_kem.py
+```
+
+The ML-KEM Python backend requires `cryptography>=47`.
+
+## Tests and attacks
 
 ```bash
 python -m unittest discover -s tests -v
 python attacks/public_recovery_v1.py
-python -m compileall -q src tests attacks
+python attacks/exhaustive_seed_recovery.py --seed-bits 8 --traces 3 --noise 0.05
+python attacks/statistical_probe.py --samples 32
+python attacks/markov_predictor.py --train 64 --test 32 -k 4
+python benchmarks/bench.py --rounds 10 --hybrid
 ```
 
-The attack script is expected to print `recovered =True`. That result confirms the repository is accurately reproducing the known KEM-v1 break.
+CI runs Python 3.11, 3.12, and 3.13, installs the real ML-KEM backend, runs unit/integration tests, reproduces the archived KEM-v1 break, performs toy seed recovery, runs a statistical smoke probe, and exercises the operational hybrid.
 
-## Current parameter profiles
+## Attack-first research
 
-The compatibility symbols `LNAT128`, `LNAT192`, and `LNAT256` remain in code, but their profile names are now:
+Current tooling includes:
 
-- `LNAT-n128-exp1`
-- `LNAT-n192-exp1`
-- `LNAT-n256-exp1`
+- complete public recovery of archived KEM-v1;
+- exhaustive minimum-Hamming-distance seed recovery for deliberately tiny seed spaces;
+- multi-trace scoring under noise;
+- monobit and lag-1 trace statistics;
+- held-out Markov next-bit prediction;
+- machine-readable parameter sweeps;
+- deterministic known-answer vectors.
 
-These labels refer to **state size only**. They do not mean 128/192/256-bit security and do not map to NIST security categories.
+See [`docs/GAMES.md`](docs/GAMES.md) and [`docs/RESEARCH_ROADMAP.md`](docs/RESEARCH_ROADMAP.md).
 
-## What counts as progress now
+## Repository layout
 
-The next milestone is not a faster KEM. It is evidence about the primitive:
+```text
+lnat-pqc/
+├── src/
+│   ├── lnat_core.py
+│   ├── lnat_params.py
+│   ├── lnat_analysis.py
+│   ├── lnat_hybrid_kem.py
+│   └── lnat_kem.py
+├── attacks/
+│   ├── public_recovery_v1.py
+│   ├── exhaustive_seed_recovery.py
+│   ├── statistical_probe.py
+│   └── markov_predictor.py
+├── experiments/parameter_sweep.py
+├── benchmarks/bench.py
+├── tests/
+└── docs/
+```
 
-1. define attack games precisely;
-2. build exhaustive attacks for tiny `n`;
-3. build SAT/SMT recovery models;
-4. develop statistical distinguishers;
-5. measure sample complexity and parameter sensitivity;
-6. determine whether any asymmetric/trapdoor mechanism can be justified;
-7. only then propose a KEM-v2 construction.
+## Research status
 
-A future KEM must include an operation available to the public-key holder that creates a secret recoverable by the private-key holder but not by an observer with the same public data. KEM-v1 did not satisfy that requirement.
+Completed:
 
-## Paper status
+- [x] KEM-v1 break reproduced and quarantined
+- [x] unsupported NIST/security-level claims removed
+- [x] EXP2 primitive specified and implemented
+- [x] keyed observation function and full domain separation
+- [x] deterministic KAT
+- [x] toy exhaustive-recovery harness
+- [x] statistical/prediction probes
+- [x] operational ML-KEM-768 hybrid KeyGen/Encap/Decap
+- [x] versioned serialization and context binding
+- [x] Python 3.11–3.13 CI
 
-`paper/LNAT_Research_Paper.docx` predates this cryptanalytic reset. It is retained as historical research material and is **not authoritative** for the current construction or security status. See [`paper/README.md`](paper/README.md).
+Open standalone-LNAT research:
 
-## Contributing
+- [ ] identify a defensible public-key trapdoor/asymmetric relation
+- [ ] stronger distinguishers and time-memory attacks
+- [ ] concrete attack-cost model for any proposed large profile
+- [ ] independent cryptanalysis
+- [ ] formal reduction/assumption if one can actually be established
+- [ ] constant-time implementation before any deployment discussion
 
-Reproducible attacks, counterexamples, formal definitions, independent implementations, and negative results are particularly valuable. See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
+## Research paper
+
+`paper/LNAT_Research_Paper.docx` predates the cryptanalytic reset and EXP2. It is historical material, not the current authoritative specification.
 
 ## License
 
-MIT License.
+MIT.
