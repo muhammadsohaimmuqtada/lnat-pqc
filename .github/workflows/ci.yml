@@ -50,6 +50,8 @@ jobs:
         run: python experiments/lnat_code_bridge_probe.py --trials 16
       - name: Public break of toy LNAT code bridge
         run: python attacks/bridge_sparse_witness_recovery.py
+      - name: Code profile correctness and search audit
+        run: python experiments/code_profile_audit.py --trivial-floor-bits 16
       - name: Operational hybrid smoke test
         run: python src/lnat_hybrid_kem.py
       - name: Compile
