@@ -4,13 +4,18 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from code_profile_audit import fixed_weight_intersection_odd_probability, minimum_repetitions_for_kem_failure
+from code_profile_audit import (
+    fixed_weight_intersection_odd_probability,
+    minimum_repetitions_for_kem_failure,
+    sparse_witness_enumeration_bits,
+)
 from code_sd_estimator import estimate_upstream_isd
 
 
@@ -22,11 +27,10 @@ class ScalePoint:
 
 
 DEFAULT_POINTS = (
-    ScalePoint(256, 128, 48),
-    ScalePoint(512, 256, 96),
-    ScalePoint(1024, 512, 192),
-    ScalePoint(1536, 768, 288),
-    ScalePoint(2048, 1024, 384),
+    ScalePoint(256, 128, 28),
+    ScalePoint(512, 256, 52),
+    ScalePoint(1024, 512, 104),
+    ScalePoint(1536, 768, 156),
 )
 
 
@@ -53,10 +57,18 @@ def main() -> int:
     args = parser.parse_args()
 
     points = tuple(args.point) if args.point else DEFAULT_POINTS
-    print("n,k,w,relative_weight,fastest,time_bits,memory_bits,repetitions,cutoff,kem_failure_bound")
+    print(
+        "n,k,w,relative_weight,fastest,upstream_time_bits,upstream_memory_bits,"
+        "support_enumeration_bits,effective_attack_bits,effective_attack,"
+        "repetitions,cutoff,kem_failure_bound"
+    )
     for point in points:
         report = estimate_upstream_isd(point.n, point.k, point.weight)
         fastest = report.fastest
+        support_bits = sparse_witness_enumeration_bits(point.n, point.weight)
+        effective_bits = min(fastest.time_bits, support_bits)
+        effective_attack = fastest.algorithm if fastest.time_bits <= support_bits else "SupportEnumeration"
+
         odd_probability = fixed_weight_intersection_odd_probability(
             point.n, point.weight, args.error_weight
         )
@@ -78,9 +90,13 @@ def main() -> int:
         print(
             f"{point.n},{point.k},{point.weight},{point.weight/point.n:.8f},"
             f"{fastest.algorithm},{fastest.time_bits:.6f},{memory},"
+            f"{support_bits:.6f},{effective_bits:.6f},{effective_attack},"
             f"{repetitions},{cutoff},{bound}"
         )
-    print("interpretation=finite attack-screening estimates from pinned upstream model; not security proofs")
+    print(
+        "interpretation=effective attack screen is min(pinned upstream ISD, direct support enumeration); "
+        "finite estimates only, not security proofs"
+    )
     return 0
 
 
