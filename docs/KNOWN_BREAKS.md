@@ -30,19 +30,33 @@ The attack harness exactly recovers deliberately tiny seeds by exhaustive minimu
 
 Do not extrapolate toy exhaustive-search results into a security level for larger profiles without a justified attack model.
 
-## LNAT-CODE-BRIDGE-0 toy profiles: public sparse-witness recovery
+## LNAT-CODE-BRIDGE-0 toy profiles: public decoding recovery
 
 **Status:** expected complete break of the deliberately tiny bridge parameters; reproducible.
 
-The bridge uses a 256-bit LNAT seed to deterministically select an exact-weight sparse code error `e`, but the public key exposes the random-code decoding instance `y = c + e`. An attacker does not need to recover the LNAT seed. They can enumerate all public weight-`w` candidates and test the public syndrome relation:
+The bridge uses a 256-bit LNAT seed to deterministically select an exact-weight sparse code error `e`, but the public key exposes the random-code decoding instance `y = c + e`. An attacker does not need to recover the LNAT seed.
+
+### Full sparse enumeration
+
+An attacker can enumerate every public weight-`w` candidate and test the syndrome relation:
 
 ```text
 for each weight-w candidate e':
     test whether y + e' belongs to the public code C
 ```
 
-For the CI bridge profile `(n=64, w=2)`, this is only `C(64,2) = 2016` candidates, or about `10.98` bits of witness space. Once `e` is recovered, the attacker can decrypt the toy code-PKE ciphertexts directly.
+For the CI bridge profile `(n=64, w=2)`, this is only `C(64,2) = 2016` candidates, or about `10.98` bits of witness space.
 
-Regression: `attacks/bridge_sparse_witness_recovery.py` and `tests/test_code_attacks.py`.
+### Prange-style information-set decoding
 
-This result is deliberately recorded because **master-seed length is not a security metric** when the public hidden object lives in a much smaller support. Future bridge parameters must be evaluated against concrete decoding/ISD/BKW-style attack costs rather than against the LNAT seed size.
+Full enumeration is not the best obvious attack. A basic Prange-style decoder samples `n-k` coordinates, solves the restricted public syndrome system, and accepts a solution of the advertised weight. The simple combinatorial model for `(n=64,k=32,w=2)` requires only
+
+```text
+C(64,2) / C(32,2) ≈ 4.06
+```
+
+expected information-set trials, before accounting for the polynomial linear-algebra work in each trial.
+
+`src/code_attacks.py` implements this reduced-parameter decoder, and `attacks/bridge_sparse_witness_recovery.py` requires both public recovery methods to succeed and decrypt the test ciphertexts.
+
+This result is deliberately recorded because **master-seed length is not a security metric** when the public hidden object can be attacked directly. Future bridge parameters must be evaluated against concrete decoding/ISD/BKW-style attack costs rather than against the LNAT seed size or full witness count alone.
